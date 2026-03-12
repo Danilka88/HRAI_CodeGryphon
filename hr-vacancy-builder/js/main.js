@@ -1,4 +1,5 @@
 // ─── SECTION: Imports ───
+import { selectBestVacancyVersion } from "./best-version.js";
 import { DEFAULT_MODEL, derror, dlog } from "./config.js";
 import {
   clearAllHistory,
@@ -12,6 +13,7 @@ import {
 } from "./indexeddb.js";
 import { generateRequirements as generateRequirementsRequest } from "./ollama-api.js";
 import {
+  getBestVersionResult,
   getCurrentScreen,
   getHistoryFilter,
   getHistoryRecords,
@@ -22,6 +24,7 @@ import {
   resetRuntimeState,
   resetState,
   saveState,
+  setBestVersionResult,
   setCurrentScreen,
   setHistoryFilter,
   setHistoryRecords,
@@ -60,6 +63,10 @@ const dom = {
   screenPreview: document.getElementById("screenPreview"),
   screenAnalysis: document.getElementById("screenAnalysis"),
   screenArchive: document.getElementById("screenArchive"),
+  screenBestVersion: document.getElementById("screenBestVersion"),
+  globalNavNewButton: document.getElementById("globalNavNewButton"),
+  globalNavArchiveButton: document.getElementById("globalNavArchiveButton"),
+  globalCurrentVacancy: document.getElementById("globalCurrentVacancy"),
   openArchiveButton: document.getElementById("openArchiveButton"),
   queryInput: document.getElementById("queryInput"),
   modelSelect: document.getElementById("modelSelect"),
@@ -90,6 +97,11 @@ const dom = {
   historyEmpty: document.getElementById("historyEmpty"),
   backFromArchiveButton: document.getElementById("backFromArchiveButton"),
   clearHistoryButton: document.getElementById("clearHistoryButton"),
+  bestVersionQueryTitle: document.getElementById("bestVersionQueryTitle"),
+  bestVersionBestBlock: document.getElementById("bestVersionBestBlock"),
+  bestVersionWhyBlock: document.getElementById("bestVersionWhyBlock"),
+  openBestVacancyButton: document.getElementById("openBestVacancyButton"),
+  backToArchiveFromBestButton: document.getElementById("backToArchiveFromBestButton"),
   globalError: document.getElementById("globalError"),
   globalErrorMessage: document.getElementById("globalErrorMessage"),
   retryButton: document.getElementById("retryButton")
@@ -226,13 +238,19 @@ async function generateRequirements() {
   }
 }
 
-function startOver() {
+function startOver(source = "workflow") {
   hideError();
   resetState();
   saveState();
   resetRuntimeState();
   resetPdfPreview();
-  dlog("init", "start over");
+
+  if (source === "navigation") {
+    dlog("navigation", "Started new vacancy");
+  } else {
+    dlog("init", "start over");
+  }
+
   renderCurrentScreen();
 }
 
@@ -370,11 +388,16 @@ function onDownloadAnalysis() {
   downloadMarkdown(filename, markdown);
 }
 
-async function onOpenArchive() {
+async function onOpenArchive(source = "workflow") {
   hideError();
   try {
     await refreshHistory();
     setCurrentScreen("archive");
+
+    if (source === "navigation") {
+      dlog("navigation", "Navigated to History");
+    }
+
     renderCurrentScreen();
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Не удалось открыть архив.";
@@ -388,6 +411,53 @@ function onBackFromArchive() {
   const target = state.items.length ? "cards" : "input";
   setCurrentScreen(target);
   renderCurrentScreen();
+}
+
+function onBackToArchiveFromBest() {
+  hideError();
+  setCurrentScreen("archive");
+  renderCurrentScreen();
+}
+
+async function onOpenBestVacancy() {
+  hideError();
+  const result = getBestVersionResult();
+  if (!result || !Number.isInteger(result.bestVacancyId)) {
+    showError("Не удалось определить лучшую вакансию для открытия.");
+    return;
+  }
+
+  try {
+    await openHistoryRecord("vacancy", result.bestVacancyId);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось открыть выбранную лучшую вакансию.";
+    derror("best-version", "open vacancy", "error", msg);
+    showError(`Не удалось открыть выбранную лучшую вакансию. ${msg}`);
+  }
+}
+
+async function onFindBestVersion(vacancyId) {
+  hideError();
+  setBestVersionResult(null);
+  dlog("best-version", "start", "vacancy", vacancyId);
+
+  try {
+    const result = await selectBestVacancyVersion({
+      vacancyId,
+      model: state.model || DEFAULT_MODEL
+    });
+
+    setBestVersionResult(result);
+    setCurrentScreen("best-version");
+    dlog("best-version", "ready", "best vacancy", result.bestVacancyId, "query", result.query);
+    renderCurrentScreen();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось выбрать лучшую версию вакансии.";
+    derror("best-version", "error", msg);
+    showError(`Не удалось выбрать лучшую версию вакансии. ${msg}`, () => {
+      onFindBestVersion(vacancyId);
+    });
+  }
 }
 
 async function onHistoryFilterChange() {
@@ -428,6 +498,11 @@ async function onHistoryGridClick(event) {
       return;
     }
 
+    if (action === "find-best-version") {
+      await onFindBestVersion(id);
+      return;
+    }
+
     if (action === "delete-history") {
       const ok = window.confirm("Удалить выбранную запись из архива? Это действие нельзя отменить.");
       if (!ok) {
@@ -457,6 +532,7 @@ async function onClearHistory() {
     await clearAllHistory();
     setHistoryRecords([]);
     setSelectedHistoryEntry(null);
+    setBestVersionResult(null);
     renderArchiveScreen();
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Не удалось очистить архив.";
@@ -467,6 +543,14 @@ async function onClearHistory() {
 
 // ─── SECTION: Event Wiring ───
 function setupEventListeners() {
+  dom.globalNavNewButton.addEventListener("click", () => {
+    startOver("navigation");
+  });
+
+  dom.globalNavArchiveButton.addEventListener("click", () => {
+    onOpenArchive("navigation");
+  });
+
   dom.openArchiveButton.addEventListener("click", () => {
     onOpenArchive();
   });
@@ -482,7 +566,9 @@ function setupEventListeners() {
   });
   dom.downloadButton.addEventListener("click", onDownload);
   dom.nextToAnalysisButton.addEventListener("click", onNextToAnalysis);
-  dom.startOverButton.addEventListener("click", startOver);
+  dom.startOverButton.addEventListener("click", () => {
+    startOver();
+  });
 
   dom.compareButton.addEventListener("click", async () => {
     state.resumeText = dom.resumeInput.value;
@@ -496,7 +582,9 @@ function setupEventListeners() {
   });
   dom.backToPreviewButton.addEventListener("click", onBackToPreview);
   dom.downloadAnalysisButton.addEventListener("click", onDownloadAnalysis);
-  dom.analysisStartOverButton.addEventListener("click", startOver);
+  dom.analysisStartOverButton.addEventListener("click", () => {
+    startOver();
+  });
 
   dom.historyFilterSelect.addEventListener("change", () => {
     onHistoryFilterChange();
@@ -507,6 +595,14 @@ function setupEventListeners() {
   dom.backFromArchiveButton.addEventListener("click", onBackFromArchive);
   dom.clearHistoryButton.addEventListener("click", () => {
     onClearHistory();
+  });
+
+  dom.openBestVacancyButton.addEventListener("click", () => {
+    onOpenBestVacancy();
+  });
+
+  dom.backToArchiveFromBestButton.addEventListener("click", () => {
+    onBackToArchiveFromBest();
   });
 
   dom.retryButton.addEventListener("click", runRetryAction);

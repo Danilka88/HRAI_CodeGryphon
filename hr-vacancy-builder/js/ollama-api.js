@@ -103,6 +103,40 @@ function buildResumeAnalysisPrompt(requirements, resumeText) {
   ].join("\n");
 }
 
+function buildBestVersionPrompt(query, vacancies) {
+  const vacancyLines = vacancies
+    .map((vacancy, index) => {
+      const requirements = Array.isArray(vacancy?.items)
+        ? vacancy.items
+          .filter((item) => item && item.status !== "rejected" && typeof item.text === "string" && item.text.trim())
+          .map((item) => `- ${item.text.trim()}`)
+          .join("\n")
+        : "";
+
+      const safeRequirements = requirements || "- Нет утвержденных требований";
+      return [
+        `КАНДИДАТ_${index + 1}_ID: ${Number(vacancy?.id) || 0}`,
+        `КАНДИДАТ_${index + 1}_МОДЕЛЬ: ${typeof vacancy?.model === "string" && vacancy.model.trim() ? vacancy.model.trim() : DEFAULT_MODEL}`,
+        `КАНДИДАТ_${index + 1}_ТРЕБОВАНИЯ:`,
+        safeRequirements
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  return [
+    "Ты — старший HR-эксперт по качеству текстов вакансий.",
+    "Нужно выбрать ЛУЧШУЮ версию вакансии среди кандидатов с одинаковым запросом.",
+    "Верни ответ строго в формате из 3 частей через ;;; без дополнительных слов:",
+    "BEST_ID: <числовой id лучшей вакансии>;;;BEST_TEXT: <кратко лучшая версия 1-3 предложения>;;;WHY_NOT_OTHERS: <почему остальные хуже, 1-3 предложения>",
+    "Запрещено добавлять markdown, JSON, списки, вступления и заключения.",
+    "",
+    `Запрос вакансии: ${query}`,
+    "",
+    "Кандидаты:",
+    vacancyLines
+  ].join("\n");
+}
+
 // ─── SECTION: Public API ───
 export async function generateRequirements({ query, model }) {
   const selectedModel = model || DEFAULT_MODEL;
@@ -114,4 +148,10 @@ export async function generateResumeAnalysis({ requirements, resumeText, model }
   const selectedModel = model || DEFAULT_MODEL;
   const prompt = buildResumeAnalysisPrompt(requirements, resumeText);
   return callOllamaGenerate(prompt, selectedModel, "analysis");
+}
+
+export async function generateBestVersionChoice({ query, vacancies, model }) {
+  const selectedModel = model || DEFAULT_MODEL;
+  const prompt = buildBestVersionPrompt(query, Array.isArray(vacancies) ? vacancies : []);
+  return callOllamaGenerate(prompt, selectedModel, "best-version");
 }

@@ -35,6 +35,17 @@ function openRequestToPromise(request, label) {
   });
 }
 
+function normalizeQueryText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function sanitizeVacancyItems(items) {
   if (!Array.isArray(items)) {
     return [];
@@ -207,6 +218,25 @@ export async function listVacancyRecords() {
   const request = store.getAll();
   const items = await openRequestToPromise(request, "list vacancies");
   return Array.isArray(items) ? items : [];
+}
+
+export async function listRecentVacanciesByQuery(query, limit = 3) {
+  const normalizedQuery = normalizeQueryText(query);
+  const normalizedLimit = Number(limit);
+  const safeLimit = Number.isInteger(normalizedLimit) && normalizedLimit > 0 ? normalizedLimit : 3;
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const records = await listVacancyRecords();
+  const similarRecords = records
+    .filter((record) => normalizeQueryText(record?.query) === normalizedQuery)
+    .sort((a, b) => (Number(b?.timestamp) || 0) - (Number(a?.timestamp) || 0))
+    .slice(0, safeLimit);
+
+  dlog("indexeddb", "list similar vacancies", "query", normalizedQuery, "total", similarRecords.length);
+  return similarRecords;
 }
 
 // ─── SECTION: Analysis CRUD ───

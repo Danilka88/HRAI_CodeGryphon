@@ -22,6 +22,7 @@ let lastAnalysisMarkdown = "";
 let historyFilter = "all";
 let historyRecords = [];
 let selectedHistoryEntry = null;
+let bestVersionResult = null;
 
 // ─── SECTION: State Helpers ───
 const sanitizeRequirementItems = (items) => {
@@ -169,9 +170,29 @@ export function setSelectedHistoryEntry(entry) {
   };
 }
 
+export function getBestVersionResult() {
+  return bestVersionResult;
+}
+
+export function setBestVersionResult(result) {
+  if (!result || typeof result !== "object") {
+    bestVersionResult = null;
+    return;
+  }
+
+  const bestVacancyId = Number(result.bestVacancyId);
+  bestVersionResult = {
+    query: typeof result.query === "string" ? result.query : "",
+    bestVacancyId: Number.isInteger(bestVacancyId) ? bestVacancyId : null,
+    bestVacancyText: typeof result.bestVacancyText === "string" ? result.bestVacancyText : "",
+    whyNotOthers: typeof result.whyNotOthers === "string" ? result.whyNotOthers : ""
+  };
+}
+
 export function resetRuntimeState() {
   currentScreen = "input";
   lastMarkdown = "";
   lastAnalysisMarkdown = "";
   selectedHistoryEntry = null;
+  bestVersionResult = null;
 }

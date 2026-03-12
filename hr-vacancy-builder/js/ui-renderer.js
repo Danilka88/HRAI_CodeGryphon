@@ -1,6 +1,7 @@
 // ─── SECTION: Imports ───
 import { DEFAULT_MODEL } from "./config.js";
 import {
+  getBestVersionResult,
   getCurrentScreen,
   getHistoryFilter,
   getHistoryRecords,
@@ -46,6 +47,23 @@ export function resetPdfPreview() {
 
   dom.pdfPreview.removeAttribute("src");
   dom.pdfPreviewWrap.classList.add("hidden");
+}
+
+function updateGlobalNav() {
+  if (!dom) {
+    return;
+  }
+
+  const currentTitle = (state.query || "").trim();
+  dom.globalCurrentVacancy.textContent = currentTitle
+    ? `Текущая вакансия: ${currentTitle}`
+    : "Текущая вакансия: не выбрана";
+
+  const isArchiveScreen = getCurrentScreen() === "archive";
+  dom.globalNavArchiveButton.classList.toggle("bg-slate-700", isArchiveScreen);
+  dom.globalNavArchiveButton.classList.toggle("hover:bg-slate-800", isArchiveScreen);
+  dom.globalNavArchiveButton.classList.toggle("bg-blue-600", !isArchiveScreen);
+  dom.globalNavArchiveButton.classList.toggle("hover:bg-blue-700", !isArchiveScreen);
 }
 
 // ─── SECTION: Card Renderers ───
@@ -212,7 +230,20 @@ function buildHistoryRow(record) {
   deleteButton.className = "rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700";
   deleteButton.textContent = "Удалить";
 
-  actions.append(selectButton, openButton, editButton, deleteButton);
+  actions.append(selectButton, openButton, editButton);
+
+  if (record.kind === "vacancy") {
+    const findBestButton = document.createElement("button");
+    findBestButton.type = "button";
+    findBestButton.dataset.action = "find-best-version";
+    findBestButton.dataset.kind = record.kind;
+    findBestButton.dataset.id = String(record.id);
+    findBestButton.className = "rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-700";
+    findBestButton.textContent = "Найти лучшую версию";
+    actions.append(findBestButton);
+  }
+
+  actions.append(deleteButton);
   header.append(headingWrap, actions);
   wrapper.append(header);
   return wrapper;
@@ -226,10 +257,12 @@ export function renderInputScreen() {
   dom.screenPreview.classList.add("hidden");
   dom.screenAnalysis.classList.add("hidden");
   dom.screenArchive.classList.add("hidden");
+  dom.screenBestVersion.classList.add("hidden");
 
   dom.queryInput.value = state.query || "";
   dom.modelSelect.value = state.model || DEFAULT_MODEL;
   setGenerating(false);
+  updateGlobalNav();
 }
 
 export function renderCardsScreen() {
@@ -239,6 +272,7 @@ export function renderCardsScreen() {
   dom.screenPreview.classList.add("hidden");
   dom.screenAnalysis.classList.add("hidden");
   dom.screenArchive.classList.add("hidden");
+  dom.screenBestVersion.classList.add("hidden");
 
   dom.cardsGrid.innerHTML = "";
   state.items.forEach((item, index) => {
@@ -247,6 +281,7 @@ export function renderCardsScreen() {
 
   dom.cardsMetaCount.textContent = String(state.items.length);
   dom.createDocumentButton.disabled = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).length === 0;
+  updateGlobalNav();
 }
 
 export function renderPreviewScreen() {
@@ -256,10 +291,12 @@ export function renderPreviewScreen() {
   dom.screenPreview.classList.add("flex");
   dom.screenAnalysis.classList.add("hidden");
   dom.screenArchive.classList.add("hidden");
+  dom.screenBestVersion.classList.add("hidden");
 
   const markdown = buildMarkdown(state);
   setLastMarkdown(markdown);
   dom.markdownPreview.textContent = markdown;
+  updateGlobalNav();
 }
 
 export function renderAnalysisScreen() {
@@ -269,6 +306,7 @@ export function renderAnalysisScreen() {
   dom.screenAnalysis.classList.remove("hidden");
   dom.screenAnalysis.classList.add("flex");
   dom.screenArchive.classList.add("hidden");
+  dom.screenBestVersion.classList.add("hidden");
 
   dom.resumeInput.value = state.resumeText || "";
   dom.analysisGrid.innerHTML = "";
@@ -279,6 +317,7 @@ export function renderAnalysisScreen() {
   dom.analysisMetaCount.textContent = String(state.analysisItems.length);
   dom.downloadAnalysisButton.disabled = !state.analysisItems.length;
   setComparing(false);
+  updateGlobalNav();
 }
 
 export function renderArchiveScreen() {
@@ -288,6 +327,7 @@ export function renderArchiveScreen() {
   dom.screenAnalysis.classList.add("hidden");
   dom.screenArchive.classList.remove("hidden");
   dom.screenArchive.classList.add("flex");
+  dom.screenBestVersion.classList.add("hidden");
 
   const records = getHistoryRecords();
   dom.historyFilterSelect.value = getHistoryFilter();
@@ -299,6 +339,23 @@ export function renderArchiveScreen() {
   });
 
   dom.historyEmpty.classList.toggle("hidden", records.length > 0);
+  updateGlobalNav();
+}
+
+export function renderBestVersionScreen() {
+  dom.screenInput.classList.add("hidden");
+  dom.screenCards.classList.add("hidden");
+  dom.screenPreview.classList.add("hidden");
+  dom.screenAnalysis.classList.add("hidden");
+  dom.screenArchive.classList.add("hidden");
+  dom.screenBestVersion.classList.remove("hidden");
+  dom.screenBestVersion.classList.add("flex");
+
+  const result = getBestVersionResult();
+  dom.bestVersionQueryTitle.textContent = `Вакансия: ${result?.query || "—"}`;
+  dom.bestVersionBestBlock.textContent = result?.bestVacancyText || "—";
+  dom.bestVersionWhyBlock.textContent = result?.whyNotOthers || "—";
+  updateGlobalNav();
 }
 
 export function renderCurrentScreen() {
@@ -321,6 +378,11 @@ export function renderCurrentScreen() {
 
   if (currentScreen === "archive") {
     renderArchiveScreen();
+    return;
+  }
+
+  if (currentScreen === "best-version") {
+    renderBestVersionScreen();
     return;
   }
 
