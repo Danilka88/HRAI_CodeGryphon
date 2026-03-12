@@ -1,11 +1,16 @@
 // ─── SECTION: Imports ───
 import { DEFAULT_MODEL, derror, dlog } from "./config.js";
+import {
+  createAnalysisRecord,
+  updateAnalysisRecord
+} from "./indexeddb.js";
 import { generateResumeAnalysis } from "./ollama-api.js";
 import { saveState, state } from "./state.js";
 import {
   parseAnalysisResponse,
   showError,
-  hideError
+  hideError,
+  buildAnalysisMarkdown
 } from "./utils.js";
 import {
   renderAnalysisScreen,
@@ -30,6 +35,29 @@ function readFileAsDataURL(file) {
     reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
     reader.readAsDataURL(file);
   });
+}
+
+async function persistAnalysisSnapshot() {
+  const markdown = buildAnalysisMarkdown(state);
+  const payload = {
+    vacancyId: Number.isInteger(state.activeVacancyId) ? state.activeVacancyId : null,
+    query: state.query,
+    model: state.model,
+    resumeText: state.resumeText,
+    analysisItems: state.analysisItems,
+    markdown
+  };
+
+  if (Number.isInteger(state.activeAnalysisId)) {
+    await updateAnalysisRecord(state.activeAnalysisId, payload);
+    dlog("indexeddb", "analysis updated", state.activeAnalysisId);
+    return state.activeAnalysisId;
+  }
+
+  const createdId = await createAnalysisRecord(payload);
+  state.activeAnalysisId = createdId;
+  dlog("indexeddb", "analysis created", createdId);
+  return createdId;
 }
 
 // ─── SECTION: Resume Upload Logic ───
@@ -66,7 +94,7 @@ export async function onResumeFile(file, dom) {
     }
 
     state.resumeText = text;
-    saveState(showError);
+    saveState();
     dom.resumeInput.value = text;
     dlog("upload", "text loaded", "chars", text.length);
   } catch (error) {
@@ -97,7 +125,7 @@ export async function compareResumeWithRequirements() {
   }
 
   state.model = model;
-  saveState(showError);
+  saveState();
   dlog("analysis", "starting", "resume chars", resumeText.length, "requirements", requirements.length, "model", model);
 
   setComparing(true);
@@ -107,11 +135,26 @@ export async function compareResumeWithRequirements() {
       resumeText,
       model
     });
+
     const parsed = parseAnalysisResponse(outputText);
     state.analysisItems = parsed;
-    saveState(showError);
+    saveState();
     dlog("analysis", "parsed items", parsed.length);
+
+    let persistenceWarning = "";
+    try {
+      await persistAnalysisSnapshot();
+      saveState();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Не удалось сохранить анализ в архив.";
+      derror("indexeddb", "save analysis", "error", msg);
+      persistenceWarning = `Анализ сформирован, но сохранить его в архив не удалось. ${msg}`;
+    }
+
     renderAnalysisScreen();
+    if (persistenceWarning) {
+      showError(persistenceWarning);
+    }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Неизвестная ошибка.";
     derror("analysis", "error", msg);
@@ -141,7 +184,7 @@ export function onAnalysisGridClick(event, dom) {
   if (action === "toggle") {
     item.type = item.type === "weakness" ? "strength" : "weakness";
     item.isEditing = false;
-    saveState(showError);
+    saveState();
     dlog("analysis card", "index", index, "action", action, "new", { type: item.type, text: item.text });
     renderAnalysisScreen();
     return;
@@ -174,7 +217,7 @@ export function onAnalysisGridClick(event, dom) {
 
     item.text = updatedText;
     item.isEditing = false;
-    saveState(showError);
+    saveState();
     dlog("analysis card", "index", index, "action", action, "new", { type: item.type, text: item.text });
     renderAnalysisScreen();
   }

@@ -1,5 +1,5 @@
 // ─── SECTION: Imports ───
-import { DEFAULT_MODEL, STORAGE_KEY, dlog } from "./config.js";
+import { DEFAULT_MODEL, dlog } from "./config.js";
 
 // ─── SECTION: Persistent State ───
 const createInitialState = () => ({
@@ -8,6 +8,8 @@ const createInitialState = () => ({
   items: [],
   resumeText: "",
   analysisItems: [],
+  activeVacancyId: null,
+  activeAnalysisId: null,
   version: 1
 });
 
@@ -17,71 +19,87 @@ export const state = createInitialState();
 let currentScreen = "input";
 let lastMarkdown = "";
 let lastAnalysisMarkdown = "";
+let historyFilter = "all";
+let historyRecords = [];
+let selectedHistoryEntry = null;
 
 // ─── SECTION: State Helpers ───
+const sanitizeRequirementItems = (items) => {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .filter((item) => item && typeof item.text === "string")
+    .map((item, idx) => ({
+      id: typeof item.id === "string" ? item.id : `req-${Date.now()}-${idx}`,
+      text: item.text.trim(),
+      status: item.status === "rejected" ? "rejected" : "approved",
+      isEditing: false
+    }))
+    .filter((item) => item.text);
+};
+
+const sanitizeAnalysisItems = (items) => {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .filter((item) => item && typeof item.text === "string")
+    .map((item, idx) => ({
+      id: typeof item.id === "string" ? item.id : `analysis-${Date.now()}-${idx}`,
+      text: item.text.trim(),
+      type: item.type === "weakness" ? "weakness" : "strength",
+      isEditing: false
+    }))
+    .filter((item) => item.text);
+};
+
 const hydrateState = (nextState) => {
-  state.query = nextState.query;
-  state.model = nextState.model;
-  state.items = nextState.items;
-  state.resumeText = nextState.resumeText;
-  state.analysisItems = nextState.analysisItems;
+  state.query = typeof nextState.query === "string" ? nextState.query : "";
+  state.model = typeof nextState.model === "string" && nextState.model ? nextState.model : DEFAULT_MODEL;
+  state.items = sanitizeRequirementItems(nextState.items);
+  state.resumeText = typeof nextState.resumeText === "string" ? nextState.resumeText : "";
+  state.analysisItems = sanitizeAnalysisItems(nextState.analysisItems);
+
+  const vacancyId = Number(nextState.activeVacancyId);
+  const analysisId = Number(nextState.activeAnalysisId);
+  state.activeVacancyId = Number.isInteger(vacancyId) ? vacancyId : null;
+  state.activeAnalysisId = Number.isInteger(analysisId) ? analysisId : null;
   state.version = 1;
 };
 
-export function saveState(showError = null) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (_error) {
-    if (typeof showError === "function") {
-      showError("Не удалось сохранить прогресс в localStorage. Освободите место и повторите попытку.");
-    }
-  }
+export function saveState() {
+  dlog("state", "runtime updated", "items", state.items.length, "analysis", state.analysisItems.length);
 }
 
-export function loadState(showError = null) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      state.model = DEFAULT_MODEL;
-      return;
-    }
+export function loadState() {
+  hydrateState(createInitialState());
+}
 
-    const parsed = JSON.parse(raw);
-    const nextState = {
-      query: typeof parsed?.query === "string" ? parsed.query : "",
-      model: typeof parsed?.model === "string" && parsed.model ? parsed.model : DEFAULT_MODEL,
-      items: Array.isArray(parsed?.items)
-        ? parsed.items
-          .filter((item) => item && typeof item.text === "string")
-          .map((item, idx) => ({
-            id: typeof item.id === "string" ? item.id : `saved-${idx}-${Date.now()}`,
-            text: item.text.trim(),
-            status: item.status === "rejected" ? "rejected" : "approved",
-            isEditing: false
-          }))
-          .filter((item) => item.text)
-        : [],
-      resumeText: typeof parsed?.resumeText === "string" ? parsed.resumeText : "",
-      analysisItems: Array.isArray(parsed?.analysisItems)
-        ? parsed.analysisItems
-          .filter((item) => item && typeof item.text === "string")
-          .map((item, idx) => ({
-            id: typeof item.id === "string" ? item.id : `analysis-saved-${idx}-${Date.now()}`,
-            type: item.type === "weakness" ? "weakness" : "strength",
-            text: item.text.trim(),
-            isEditing: false
-          }))
-          .filter((item) => item.text)
-        : [],
-      version: 1
-    };
+export function loadVacancyIntoState(record) {
+  hydrateState({
+    query: typeof record?.query === "string" ? record.query : "",
+    model: typeof record?.model === "string" ? record.model : DEFAULT_MODEL,
+    items: Array.isArray(record?.items) ? record.items : [],
+    resumeText: "",
+    analysisItems: [],
+    activeVacancyId: Number(record?.id),
+    activeAnalysisId: null
+  });
+}
 
-    hydrateState(nextState);
-  } catch (_error) {
-    dlog("state", "restore failed, resetting storage payload");
-    hydrateState(createInitialState());
-    saveState(showError);
-  }
+export function loadAnalysisIntoState(record, linkedVacancyItems = []) {
+  hydrateState({
+    query: typeof record?.query === "string" ? record.query : "",
+    model: typeof record?.model === "string" ? record.model : DEFAULT_MODEL,
+    items: Array.isArray(linkedVacancyItems) ? linkedVacancyItems : [],
+    resumeText: typeof record?.resumeText === "string" ? record.resumeText : "",
+    analysisItems: Array.isArray(record?.analysisItems) ? record.analysisItems : [],
+    activeVacancyId: Number.isInteger(Number(record?.vacancyId)) ? Number(record.vacancyId) : null,
+    activeAnalysisId: Number(record?.id)
+  });
 }
 
 export function resetState() {
@@ -113,8 +131,47 @@ export function setLastAnalysisMarkdown(value) {
   lastAnalysisMarkdown = typeof value === "string" ? value : "";
 }
 
+export function getHistoryFilter() {
+  return historyFilter;
+}
+
+export function setHistoryFilter(value) {
+  historyFilter = value === "vacancies" || value === "analyses" ? value : "all";
+}
+
+export function getHistoryRecords() {
+  return historyRecords;
+}
+
+export function setHistoryRecords(records) {
+  historyRecords = Array.isArray(records) ? records : [];
+}
+
+export function getSelectedHistoryEntry() {
+  return selectedHistoryEntry;
+}
+
+export function setSelectedHistoryEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    selectedHistoryEntry = null;
+    return;
+  }
+
+  const normalizedId = Number(entry.id);
+  if (!Number.isInteger(normalizedId) || (entry.kind !== "vacancy" && entry.kind !== "analysis")) {
+    selectedHistoryEntry = null;
+    return;
+  }
+
+  selectedHistoryEntry = {
+    id: normalizedId,
+    kind: entry.kind
+  };
+}
+
 export function resetRuntimeState() {
   currentScreen = "input";
   lastMarkdown = "";
   lastAnalysisMarkdown = "";
+  selectedHistoryEntry = null;
 }

@@ -1,14 +1,32 @@
 // ─── SECTION: Imports ───
 import { DEFAULT_MODEL, derror, dlog } from "./config.js";
+import {
+  clearAllHistory,
+  createVacancyRecord,
+  deleteHistoryRecord,
+  getAnalysisRecordById,
+  getVacancyRecordById,
+  initDatabase,
+  listHistoryRecords,
+  updateVacancyRecord
+} from "./indexeddb.js";
 import { generateRequirements as generateRequirementsRequest } from "./ollama-api.js";
 import {
+  getCurrentScreen,
+  getHistoryFilter,
+  getHistoryRecords,
   getLastMarkdown,
+  loadAnalysisIntoState,
+  loadState,
+  loadVacancyIntoState,
   resetRuntimeState,
   resetState,
   saveState,
-  loadState,
   setCurrentScreen,
+  setHistoryFilter,
+  setHistoryRecords,
   setLastAnalysisMarkdown,
+  setSelectedHistoryEntry,
   state
 } from "./state.js";
 import {
@@ -23,7 +41,7 @@ import {
 } from "./utils.js";
 import {
   initUIRenderer,
-  renderAnalysisScreen,
+  renderArchiveScreen,
   renderCardsScreen,
   renderCurrentScreen,
   resetPdfPreview,
@@ -41,6 +59,8 @@ const dom = {
   screenCards: document.getElementById("screenCards"),
   screenPreview: document.getElementById("screenPreview"),
   screenAnalysis: document.getElementById("screenAnalysis"),
+  screenArchive: document.getElementById("screenArchive"),
+  openArchiveButton: document.getElementById("openArchiveButton"),
   queryInput: document.getElementById("queryInput"),
   modelSelect: document.getElementById("modelSelect"),
   generateButton: document.getElementById("generateButton"),
@@ -64,10 +84,104 @@ const dom = {
   backToPreviewButton: document.getElementById("backToPreviewButton"),
   downloadAnalysisButton: document.getElementById("downloadAnalysisButton"),
   analysisStartOverButton: document.getElementById("analysisStartOverButton"),
+  historyFilterSelect: document.getElementById("historyFilterSelect"),
+  historyMetaCount: document.getElementById("historyMetaCount"),
+  historyGrid: document.getElementById("historyGrid"),
+  historyEmpty: document.getElementById("historyEmpty"),
+  backFromArchiveButton: document.getElementById("backFromArchiveButton"),
+  clearHistoryButton: document.getElementById("clearHistoryButton"),
   globalError: document.getElementById("globalError"),
   globalErrorMessage: document.getElementById("globalErrorMessage"),
   retryButton: document.getElementById("retryButton")
 };
+
+// ─── SECTION: Persistence & Archive Helpers ───
+async function persistVacancySnapshot(markdown) {
+  const payload = {
+    query: state.query,
+    model: state.model,
+    items: state.items,
+    markdown
+  };
+
+  if (Number.isInteger(state.activeVacancyId)) {
+    await updateVacancyRecord(state.activeVacancyId, payload);
+    dlog("indexeddb", "vacancy updated", state.activeVacancyId);
+    return state.activeVacancyId;
+  }
+
+  const createdId = await createVacancyRecord(payload);
+  state.activeVacancyId = createdId;
+  dlog("indexeddb", "vacancy created", createdId);
+  return createdId;
+}
+
+async function refreshHistory() {
+  const records = await listHistoryRecords(getHistoryFilter());
+  setHistoryRecords(records);
+  if (getCurrentScreen() === "archive") {
+    renderArchiveScreen();
+  }
+}
+
+async function openHistoryRecord(kind, id) {
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId)) {
+    showError("Некорректный идентификатор записи архива.");
+    return;
+  }
+
+  hideError();
+  if (kind === "vacancy") {
+    const vacancy = await getVacancyRecordById(numericId);
+    if (!vacancy) {
+      throw new Error("Выбранная вакансия не найдена в архиве.");
+    }
+
+    loadVacancyIntoState(vacancy);
+    setCurrentScreen("cards");
+    dlog("archive", "opened vacancy", numericId);
+    renderCurrentScreen();
+    return;
+  }
+
+  if (kind === "analysis") {
+    const analysis = await getAnalysisRecordById(numericId);
+    if (!analysis) {
+      throw new Error("Выбранный анализ не найден в архиве.");
+    }
+
+    let linkedItems = [];
+    const linkedVacancyId = Number(analysis.vacancyId);
+    if (Number.isInteger(linkedVacancyId)) {
+      const vacancy = await getVacancyRecordById(linkedVacancyId);
+      if (vacancy && Array.isArray(vacancy.items)) {
+        linkedItems = vacancy.items;
+      }
+    }
+
+    loadAnalysisIntoState(analysis, linkedItems);
+    setLastAnalysisMarkdown(typeof analysis.markdown === "string" ? analysis.markdown : "");
+    setCurrentScreen("analysis");
+    dlog("archive", "opened analysis", numericId, "linked vacancy", state.activeVacancyId);
+    renderCurrentScreen();
+    return;
+  }
+
+  throw new Error("Неизвестный тип записи архива.");
+}
+
+async function removeHistoryRecord(kind, id) {
+  await deleteHistoryRecord(kind, id);
+  const selected = state.activeVacancyId === Number(id) || state.activeAnalysisId === Number(id);
+  if (selected && kind === "vacancy") {
+    state.activeVacancyId = null;
+  }
+  if (selected && kind === "analysis") {
+    state.activeAnalysisId = null;
+  }
+  dlog("archive", "deleted", kind, id);
+}
 
 // ─── SECTION: Core Actions ───
 async function generateRequirements() {
@@ -83,7 +197,9 @@ async function generateRequirements() {
 
   state.query = query;
   state.model = model;
-  saveState(showError);
+  state.activeVacancyId = null;
+  state.activeAnalysisId = null;
+  saveState();
   dlog("generate", "starting", "query", query, "model", model);
 
   setGenerating(true);
@@ -93,7 +209,8 @@ async function generateRequirements() {
     const items = parseOllamaResponse(outputText);
     state.items = items;
     state.analysisItems = [];
-    saveState(showError);
+    state.resumeText = "";
+    saveState();
     dlog("ollama response", "success", "items", items.length);
 
     setCurrentScreen("cards");
@@ -112,7 +229,7 @@ async function generateRequirements() {
 function startOver() {
   hideError();
   resetState();
-  saveState(showError);
+  saveState();
   resetRuntimeState();
   resetPdfPreview();
   dlog("init", "start over");
@@ -136,7 +253,7 @@ function onCardsGridClick(event) {
 
   if (action === "approve") {
     item.status = "approved";
-    saveState(showError);
+    saveState();
     dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
     renderCardsScreen();
     return;
@@ -145,7 +262,7 @@ function onCardsGridClick(event) {
   if (action === "reject") {
     item.status = "rejected";
     item.isEditing = false;
-    saveState(showError);
+    saveState();
     dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
     renderCardsScreen();
     return;
@@ -179,7 +296,7 @@ function onCardsGridClick(event) {
     item.text = updatedText;
     item.status = "approved";
     item.isEditing = false;
-    saveState(showError);
+    saveState();
     dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
     renderCardsScreen();
   }
@@ -192,7 +309,7 @@ function onBackToInput() {
   renderCurrentScreen();
 }
 
-function onCreateDocument() {
+async function onCreateDocument() {
   hideError();
   const approvedCount = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).length;
   if (!approvedCount) {
@@ -203,6 +320,16 @@ function onCreateDocument() {
   dlog("document", "approved count", approvedCount);
   setCurrentScreen("preview");
   renderCurrentScreen();
+
+  try {
+    await persistVacancySnapshot(getLastMarkdown());
+    saveState();
+    await refreshHistory();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось сохранить вакансию.";
+    derror("indexeddb", "save vacancy", "error", msg);
+    showError(`Документ создан, но сохранить его в архив не удалось. ${msg}`);
+  }
 }
 
 function onNextToAnalysis() {
@@ -243,23 +370,125 @@ function onDownloadAnalysis() {
   downloadMarkdown(filename, markdown);
 }
 
+async function onOpenArchive() {
+  hideError();
+  try {
+    await refreshHistory();
+    setCurrentScreen("archive");
+    renderCurrentScreen();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось открыть архив.";
+    derror("archive", "open", "error", msg);
+    showError(`Не удалось открыть архив. ${msg}`);
+  }
+}
+
+function onBackFromArchive() {
+  hideError();
+  const target = state.items.length ? "cards" : "input";
+  setCurrentScreen(target);
+  renderCurrentScreen();
+}
+
+async function onHistoryFilterChange() {
+  setHistoryFilter(dom.historyFilterSelect.value);
+  setSelectedHistoryEntry(null);
+  try {
+    await refreshHistory();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось применить фильтр архива.";
+    derror("archive", "filter", "error", msg);
+    showError(`Не удалось применить фильтр архива. ${msg}`);
+  }
+}
+
+async function onHistoryGridClick(event) {
+  const target = event.target.closest("button[data-action]");
+  if (!target) {
+    return;
+  }
+
+  const action = target.dataset.action;
+  const kind = target.dataset.kind;
+  const id = Number(target.dataset.id);
+  if (!Number.isInteger(id)) {
+    showError("Некорректный идентификатор записи архива.");
+    return;
+  }
+
+  try {
+    if (action === "select-history") {
+      setSelectedHistoryEntry({ kind, id });
+      renderArchiveScreen();
+      return;
+    }
+
+    if (action === "open-history" || action === "edit-history") {
+      await openHistoryRecord(kind, id);
+      return;
+    }
+
+    if (action === "delete-history") {
+      const ok = window.confirm("Удалить выбранную запись из архива? Это действие нельзя отменить.");
+      if (!ok) {
+        return;
+      }
+
+      await removeHistoryRecord(kind, id);
+      setSelectedHistoryEntry(null);
+      await refreshHistory();
+      return;
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Ошибка работы с архивом.";
+    derror("archive", action || "unknown", "error", msg);
+    showError(`Ошибка работы с архивом. ${msg}`);
+  }
+}
+
+async function onClearHistory() {
+  const ok = window.confirm("Очистить весь архив (вакансии и анализы)? Действие необратимо.");
+  if (!ok) {
+    return;
+  }
+
+  hideError();
+  try {
+    await clearAllHistory();
+    setHistoryRecords([]);
+    setSelectedHistoryEntry(null);
+    renderArchiveScreen();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось очистить архив.";
+    derror("archive", "clear", "error", msg);
+    showError(`Не удалось очистить архив. ${msg}`);
+  }
+}
+
 // ─── SECTION: Event Wiring ───
 function setupEventListeners() {
+  dom.openArchiveButton.addEventListener("click", () => {
+    onOpenArchive();
+  });
+
   dom.generateButton.addEventListener("click", () => {
     generateRequirements();
   });
 
   dom.cardsGrid.addEventListener("click", onCardsGridClick);
   dom.backToInputButton.addEventListener("click", onBackToInput);
-  dom.createDocumentButton.addEventListener("click", onCreateDocument);
+  dom.createDocumentButton.addEventListener("click", () => {
+    onCreateDocument();
+  });
   dom.downloadButton.addEventListener("click", onDownload);
   dom.nextToAnalysisButton.addEventListener("click", onNextToAnalysis);
   dom.startOverButton.addEventListener("click", startOver);
 
-  dom.compareButton.addEventListener("click", () => {
+  dom.compareButton.addEventListener("click", async () => {
     state.resumeText = dom.resumeInput.value;
-    saveState(showError);
-    compareResumeWithRequirements();
+    saveState();
+    await compareResumeWithRequirements();
+    await refreshHistory();
   });
 
   dom.analysisGrid.addEventListener("click", (event) => {
@@ -268,21 +497,33 @@ function setupEventListeners() {
   dom.backToPreviewButton.addEventListener("click", onBackToPreview);
   dom.downloadAnalysisButton.addEventListener("click", onDownloadAnalysis);
   dom.analysisStartOverButton.addEventListener("click", startOver);
+
+  dom.historyFilterSelect.addEventListener("change", () => {
+    onHistoryFilterChange();
+  });
+  dom.historyGrid.addEventListener("click", (event) => {
+    onHistoryGridClick(event);
+  });
+  dom.backFromArchiveButton.addEventListener("click", onBackFromArchive);
+  dom.clearHistoryButton.addEventListener("click", () => {
+    onClearHistory();
+  });
+
   dom.retryButton.addEventListener("click", runRetryAction);
 
   dom.queryInput.addEventListener("input", () => {
     state.query = dom.queryInput.value;
-    saveState(showError);
+    saveState();
   });
 
   dom.modelSelect.addEventListener("change", () => {
     state.model = dom.modelSelect.value || DEFAULT_MODEL;
-    saveState(showError);
+    saveState();
   });
 
   dom.resumeInput.addEventListener("input", () => {
     state.resumeText = dom.resumeInput.value;
-    saveState(showError);
+    saveState();
   });
 
   dom.resumeFile.addEventListener("change", async () => {
@@ -313,14 +554,14 @@ function setupEventListeners() {
 }
 
 // ─── SECTION: Bootstrap ───
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   setUtilsDom(dom);
   initUIRenderer(dom);
 
-  loadState(showError);
+  loadState();
   dlog(
     "init",
-    "loaded state",
+    "loaded runtime state",
     "items",
     state.items.length,
     "analysis",
@@ -328,6 +569,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "resume chars",
     (state.resumeText || "").length
   );
+
+  try {
+    await initDatabase();
+    await refreshHistory();
+    dlog("init", "indexeddb ready", "history", getHistoryRecords().length);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Не удалось инициализировать IndexedDB.";
+    derror("indexeddb", "init", "error", msg);
+    showError(`Архив недоступен. ${msg}`);
+  }
 
   setupEventListeners();
 

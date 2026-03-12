@@ -49,7 +49,7 @@
             <p id="globalErrorMessage" class="mt-1 text-sm leading-relaxed"></p>
           </div>
           <button id="retryButton" type="button"
-            class="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
+            class="hidden inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
             Повторить
           </button>
         </div>
@@ -57,10 +57,18 @@
 
       <section id="screenInput" class="flex flex-col gap-6">
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 class="text-xl font-semibold">1) Введите запрос по вакансии</h2>
-          <p class="mt-2 text-sm text-slate-600">
-            Пример: <span class="font-medium">Детский стоматолог для клиники детской медицины</span>
-          </p>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">1) Введите запрос по вакансии</h2>
+              <p class="mt-2 text-sm text-slate-600">
+                Пример: <span class="font-medium">Детский стоматолог для клиники детской медицины</span>
+              </p>
+            </div>
+            <button id="openArchiveButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Открыть архив
+            </button>
+          </div>
 
           <label for="queryInput" class="mt-5 block text-sm font-medium text-slate-700">Запрос по вакансии</label>
           <textarea id="queryInput" rows="4" placeholder="Введите описание вакансии..."
@@ -85,7 +93,7 @@
           </div>
 
           <div id="inputHint" class="mt-4 text-xs text-slate-500">
-            Данные сохраняются только в localStorage вашего браузера.
+            Данные сохраняются в архиве IndexedDB текущего браузера.
           </div>
         </div>
       </section>
@@ -195,6 +203,50 @@
             <button id="analysisStartOverButton" type="button"
               class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
               Начать заново
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screenArchive" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">Архив вакансий и анализов</h2>
+              <p class="mt-1 text-sm text-slate-600">Откройте сохраненные записи, удалите отдельные элементы или очистите архив
+                полностью.</p>
+            </div>
+            <div class="text-xs text-slate-500">Записей: <span id="historyMetaCount">0</span></div>
+          </div>
+
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label for="historyFilterSelect" class="block text-sm font-medium text-slate-700">Фильтр</label>
+              <select id="historyFilterSelect"
+                class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                <option value="all">Все записи</option>
+                <option value="vacancies">Только вакансии</option>
+                <option value="analyses">Только анализы</option>
+              </select>
+            </div>
+            <div class="flex items-end sm:justify-end">
+              <button id="clearHistoryButton" type="button"
+                class="inline-flex w-full items-center justify-center rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 sm:w-auto">
+                Очистить весь архив
+              </button>
+            </div>
+          </div>
+
+          <p id="historyEmpty" class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Архив пока пуст. Сохраните документ вакансии или результат анализа, чтобы увидеть их здесь.
+          </p>
+
+          <div id="historyGrid" class="mt-5 grid gap-4"></div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-start">
+            <button id="backFromArchiveButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Вернуться в работу
             </button>
           </div>
         </div>
