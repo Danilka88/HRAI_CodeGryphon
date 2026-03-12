@@ -92,7 +92,7 @@ export async function selectBestVacancyVersion({ vacancyId, model }) {
 
   dlog("best-version", "candidates", candidates.length, "query", query);
   if (candidates.length < 2) {
-    throw new Error("Для этой вакансии недостаточно похожих версий в архиве (нужно минимум 2). Сгенерируйте еще одну версию с тем же query.");
+    throw new Error("Это единственная версия");
   }
 
   const selectedModel = model || sourceVacancy.model || DEFAULT_MODEL;

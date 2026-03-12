@@ -102,10 +102,52 @@ const dom = {
   bestVersionWhyBlock: document.getElementById("bestVersionWhyBlock"),
   openBestVacancyButton: document.getElementById("openBestVacancyButton"),
   backToArchiveFromBestButton: document.getElementById("backToArchiveFromBestButton"),
+  bestVersionLoadingOverlay: document.getElementById("bestVersionLoadingOverlay"),
   globalError: document.getElementById("globalError"),
   globalErrorMessage: document.getElementById("globalErrorMessage"),
   retryButton: document.getElementById("retryButton")
 };
+
+// ─── SECTION: Best Version Loading UI ───
+const BEST_VERSION_BUTTON_DEFAULT_TEXT = "Найти лучшую версию";
+let bestVersionLoadingStart = 0;
+
+function setBestVersionButtonLoading(button, isLoading) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent || BEST_VERSION_BUTTON_DEFAULT_TEXT;
+  }
+
+  button.disabled = isLoading;
+  button.textContent = isLoading ? "Поиск..." : (button.dataset.originalText || BEST_VERSION_BUTTON_DEFAULT_TEXT);
+}
+
+function showBestVersionLoading() {
+  bestVersionLoadingStart = Date.now();
+  dlog("Showing loading indicator");
+
+  if (!dom.bestVersionLoadingOverlay) {
+    return;
+  }
+
+  dom.bestVersionLoadingOverlay.classList.remove("hidden");
+  dom.bestVersionLoadingOverlay.classList.add("flex");
+}
+
+function hideBestVersionLoading() {
+  const elapsed = Math.max(0, Date.now() - bestVersionLoadingStart);
+  dlog(`Hiding loading indicator after ${elapsed} ms`);
+
+  if (!dom.bestVersionLoadingOverlay) {
+    return;
+  }
+
+  dom.bestVersionLoadingOverlay.classList.add("hidden");
+  dom.bestVersionLoadingOverlay.classList.remove("flex");
+}
 
 // ─── SECTION: Persistence & Archive Helpers ───
 async function persistVacancySnapshot(markdown) {
@@ -436,14 +478,23 @@ async function onOpenBestVacancy() {
   }
 }
 
-async function onFindBestVersion(vacancyId) {
+async function onFindBestVersion(vacancyId, triggerButton = null) {
   hideError();
   setBestVersionResult(null);
-  dlog("best-version", "start", "vacancy", vacancyId);
+
+  const numericVacancyId = Number(vacancyId);
+  const historyVacancy = getHistoryRecords().find((record) => record.kind === "vacancy" && record.id === numericVacancyId);
+  const queryTitle = historyVacancy && typeof historyVacancy.query === "string" && historyVacancy.query.trim()
+    ? historyVacancy.query.trim()
+    : "—";
+
+  dlog(`Starting best version search for query: ${queryTitle}`);
+  setBestVersionButtonLoading(triggerButton, true);
+  showBestVersionLoading();
 
   try {
     const result = await selectBestVacancyVersion({
-      vacancyId,
+      vacancyId: numericVacancyId,
       model: state.model || DEFAULT_MODEL
     });
 
@@ -455,8 +506,11 @@ async function onFindBestVersion(vacancyId) {
     const msg = error instanceof Error ? error.message : "Не удалось выбрать лучшую версию вакансии.";
     derror("best-version", "error", msg);
     showError(`Не удалось выбрать лучшую версию вакансии. ${msg}`, () => {
-      onFindBestVersion(vacancyId);
+      onFindBestVersion(numericVacancyId, triggerButton);
     });
+  } finally {
+    setBestVersionButtonLoading(triggerButton, false);
+    hideBestVersionLoading();
   }
 }
 
@@ -499,7 +553,7 @@ async function onHistoryGridClick(event) {
     }
 
     if (action === "find-best-version") {
-      await onFindBestVersion(id);
+      await onFindBestVersion(id, target);
       return;
     }
 
