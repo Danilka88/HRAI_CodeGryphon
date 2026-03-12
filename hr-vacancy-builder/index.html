@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HR Vacancy Builder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    [contenteditable="true"]:focus {
+      outline: 2px solid rgb(59 130 246 / 0.35);
+      outline-offset: 2px;
+    }
+
+    .card-transition {
+      transition: all 0.2s ease;
+    }
+
+    .markdown-preview {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 antialiased">
+  <div id="app" class="min-h-screen">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <h1 class="text-lg font-semibold sm:text-xl">HR Vacancy Requirement Builder</h1>
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">Local Ollama</span>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <section id="globalError"
+        class="hidden mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="text-sm font-semibold">Something went wrong</p>
+            <p id="globalErrorMessage" class="mt-1 text-sm leading-relaxed"></p>
+          </div>
+          <button id="retryButton" type="button"
+            class="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
+            Retry
+          </button>
+        </div>
+      </section>
+
+      <section id="screenInput" class="flex flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-xl font-semibold">1) Enter a job request</h2>
+          <p class="mt-2 text-sm text-slate-600">
+            Example: <span class="font-medium">Pediatric Dentist for a children’s clinic</span>
+          </p>
+
+          <label for="queryInput" class="mt-5 block text-sm font-medium text-slate-700">Job request</label>
+          <textarea id="queryInput" rows="4" placeholder="Type the vacancy request here..."
+            class="mt-2 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"></textarea>
+
+          <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="modelSelect" class="block text-sm font-medium text-slate-700">Ollama model</label>
+              <select id="modelSelect"
+                class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                <option value="qwen3.5:0.8b">qwen3.5:0.8b</option>
+                <option value="gemma3:4b">gemma3:4b</option>
+                <option value="qwen3.5:4b">qwen3.5:4b</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button id="generateButton" type="button"
+                class="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300">
+                Generate Requirements
+              </button>
+            </div>
+          </div>
+
+          <div id="inputHint" class="mt-4 text-xs text-slate-500">
+            Your data stays in browser localStorage only.
+          </div>
+        </div>
+      </section>
+
+      <section id="screenCards" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">2) Review and edit requirements</h2>
+              <p class="mt-1 text-sm text-slate-600">Approve, reject, or edit each requirement before generating the
+                document.</p>
+            </div>
+            <div class="text-xs text-slate-500">
+              <span id="cardsMetaCount">0</span> items total
+            </div>
+          </div>
+
+          <div id="cardsGrid" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button id="backToInputButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Back
+            </button>
+            <button id="createDocumentButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300">
+              Create Document
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screenPreview" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-xl font-semibold">3) Final Markdown preview</h2>
+          <p class="mt-2 text-sm text-slate-600">Download a clean .md document and share it with recruiters or hiring
+            managers.</p>
+
+          <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <pre id="markdownPreview" class="markdown-preview text-sm leading-relaxed text-slate-800"></pre>
+          </div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button id="downloadButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+              Download .md
+            </button>
+            <button id="nextToAnalysisButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2">
+              Next: Analyze Candidate Resume
+            </button>
+            <button id="startOverButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Start Over
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screenAnalysis" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">4) Resume Analysis</h2>
+              <p class="mt-1 text-sm text-slate-600">Paste resume text or upload/drop a file, then compare it with your
+                approved requirements.</p>
+            </div>
+            <div class="text-xs text-slate-500"><span id="analysisMetaCount">0</span> analysis cards</div>
+          </div>
+
+          <label for="resumeInput" class="mt-5 block text-sm font-medium text-slate-700">Resume text</label>
+          <textarea id="resumeInput" rows="10" placeholder="Paste candidate resume text here..."
+            class="mt-2 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"></textarea>
+
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div id="resumeDropzone"
+              class="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 transition">
+              <p class="font-medium text-slate-700">Drop .txt / .md / .pdf here</p>
+              <p class="mt-1 text-xs">Or click to upload. TXT/MD are parsed automatically. PDF preview only — paste text
+                manually.</p>
+              <input id="resumeFile" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
+                class="hidden" />
+            </div>
+            <div id="pdfPreviewWrap" class="hidden rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <embed id="pdfPreview" type="application/pdf" class="h-44 w-full rounded-lg" />
+            </div>
+          </div>
+
+          <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button id="compareButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300">
+              Compare Resume with Requirements
+            </button>
+            <button id="downloadAnalysisButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300">
+              Download Analysis.md
+            </button>
+          </div>
+
+          <div id="analysisGrid" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button id="backToPreviewButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Back to Preview
+            </button>
+            <button id="analysisStartOverButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Start Over
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
