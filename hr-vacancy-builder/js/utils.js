@@ -43,13 +43,13 @@ export function runRetryAction() {
 // ─── SECTION: Ollama Response Parsing ───
 function splitDelimitedUnique(raw, logTag) {
   if (typeof raw !== "string") {
-    throw new Error("Model response is not text.");
+    throw new Error("Ответ модели не является текстом.");
   }
 
   const normalized = raw.replace(/\r/g, "").trim();
   dlog(logTag, "raw length", normalized.length);
   if (!normalized) {
-    throw new Error("Model returned an empty response.");
+    throw new Error("Модель вернула пустой ответ.");
   }
 
   const parts = normalized
@@ -70,7 +70,7 @@ function splitDelimitedUnique(raw, logTag) {
 
   dlog(logTag, "parsed items", unique.length);
   if (!unique.length) {
-    throw new Error("Model response does not contain valid requirements separated by ;;;.");
+    throw new Error("Ответ модели не содержит корректных пунктов, разделенных через ;;;.");
   }
 
   return unique;
@@ -87,17 +87,20 @@ export function parseOllamaResponse(raw) {
 
 export function parseAnalysisResponse(raw) {
   return splitDelimitedUnique(raw, "analysis parse").map((line, idx) => {
-    const match = line.match(/^(strength|weakness)\s*:\s*(.+)$/i);
-    const type = match ? match[1].toLowerCase() : /^weak/i.test(line) ? "weakness" : "strength";
-    const text = (match ? match[2] : line.replace(/^(strength|weakness)\s*:\s*/i, "")).trim();
+    const match = line.match(/^(?:сильная\s+сторона|слабая\s+сторона|strength|weakness)\s*:\s*(.+)$/i);
+    const isWeak = /^(?:слабая\s+сторона|weakness)\s*:/i.test(line);
+    const text = (match
+      ? match[1]
+      : line.replace(/^(?:сильная\s+сторона|слабая\s+сторона|strength|weakness)\s*:\s*/i, "")
+    ).trim();
 
     if (!text) {
-      throw new Error("Analysis item text is empty.");
+      throw new Error("Текст пункта анализа пуст.");
     }
 
     return {
       id: `analysis-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
-      type: type === "weakness" ? "weakness" : "strength",
+      type: isWeak ? "weakness" : "strength",
       text,
       isEditing: false
     };
@@ -111,18 +114,18 @@ export function escapeMarkdown(text) {
 
 export function buildMarkdown(state) {
   const approvedItems = state.items.filter((item) => item.status !== "rejected" && item.text.trim());
-  const titleQuery = state.query.trim() || "Untitled Vacancy";
+  const titleQuery = state.query.trim() || "Вакансия без названия";
   const lines = [
-    `# Vacancy Requirements: ${titleQuery}`,
+    `# Требования к вакансии: ${titleQuery}`,
     "",
-    `Generated with model **${state.model || DEFAULT_MODEL}** via local Ollama.`,
+    `Сформировано моделью **${state.model || DEFAULT_MODEL}** через локальную Ollama.`,
     "",
-    "## Candidate Requirements",
+    "## Требования к кандидату",
     ""
   ];
 
   if (!approvedItems.length) {
-    lines.push("- _No approved requirements available._");
+    lines.push("- _Нет утвержденных требований._");
   } else {
     approvedItems.forEach((item) => {
       lines.push(`- ${escapeMarkdown(item.text)}`);
@@ -133,35 +136,35 @@ export function buildMarkdown(state) {
 }
 
 export function buildAnalysisMarkdown(state) {
-  const titleQuery = state.query.trim() || "Untitled Vacancy";
+  const titleQuery = state.query.trim() || "Вакансия без названия";
   const approvedItems = state.items.filter((item) => item.status !== "rejected" && item.text.trim());
   const strengths = state.analysisItems.filter((item) => item.type === "strength" && item.text.trim());
   const weaknesses = state.analysisItems.filter((item) => item.type === "weakness" && item.text.trim());
   const lines = [
-    `# Resume Analysis: ${titleQuery}`,
+    `# Анализ резюме: ${titleQuery}`,
     "",
-    `Generated with model **${state.model || DEFAULT_MODEL}** via local Ollama.`,
+    `Сформировано моделью **${state.model || DEFAULT_MODEL}** через локальную Ollama.`,
     "",
-    "## Requirements Summary",
+    "## Сводка требований",
     ""
   ];
 
   if (!approvedItems.length) {
-    lines.push("- _No approved requirements available._");
+    lines.push("- _Нет утвержденных требований._");
   } else {
     approvedItems.forEach((item) => lines.push(`- ${escapeMarkdown(item.text)}`));
   }
 
-  lines.push("", "## Strengths", "");
+  lines.push("", "## Сильные стороны", "");
   if (!strengths.length) {
-    lines.push("- _No strengths detected._");
+    lines.push("- _Сильные стороны не обнаружены._");
   } else {
     strengths.forEach((item) => lines.push(`- ${escapeMarkdown(item.text)}`));
   }
 
-  lines.push("", "## Weaknesses", "");
+  lines.push("", "## Слабые стороны", "");
   if (!weaknesses.length) {
-    lines.push("- _No weaknesses detected._");
+    lines.push("- _Слабые стороны не обнаружены._");
   } else {
     weaknesses.forEach((item) => lines.push(`- ${escapeMarkdown(item.text)}`));
   }
@@ -174,9 +177,9 @@ export function sanitizeFilename(value) {
   return (
     value
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/[^a-z0-9а-яё]+/gi, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "vacancy-requirements"
+      .slice(0, 60) || "trebovaniya-k-vakansii"
   );
 }
 

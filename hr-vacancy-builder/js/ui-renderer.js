@@ -21,10 +21,10 @@ export function setGenerating(isGenerating) {
   }
 
   dom.generateButton.disabled = isGenerating;
-  dom.generateButton.textContent = isGenerating ? "Generating..." : "Generate Requirements";
+  dom.generateButton.textContent = isGenerating ? "Генерация..." : "Сгенерировать требования";
   dom.inputHint.textContent = isGenerating
-    ? "Waiting for local Ollama response (up to 180 seconds)..."
-    : "Your data stays in browser localStorage only.";
+    ? "Ожидание ответа от локальной Ollama (до 180 секунд)..."
+    : "Данные сохраняются только в localStorage вашего браузера.";
 }
 
 export function setComparing(isComparing) {
@@ -33,7 +33,7 @@ export function setComparing(isComparing) {
   }
 
   dom.compareButton.disabled = isComparing;
-  dom.compareButton.textContent = isComparing ? "Comparing..." : "Compare Resume with Requirements";
+  dom.compareButton.textContent = isComparing ? "Сравнение..." : "Сравнить резюме с требованиями";
 }
 
 export function resetPdfPreview() {
@@ -68,7 +68,7 @@ export function renderCard(item, index) {
 
   const statusLine = document.createElement("p");
   statusLine.className = "mt-2 text-xs font-medium";
-  statusLine.textContent = item.status === "rejected" ? "Rejected" : "Approved";
+  statusLine.textContent = item.status === "rejected" ? "Отклонено" : "Утверждено";
   statusLine.classList.add(item.status === "rejected" ? "text-rose-700" : "text-emerald-700");
 
   const buttons = document.createElement("div");
@@ -79,21 +79,21 @@ export function renderCard(item, index) {
   approveButton.dataset.action = "approve";
   approveButton.dataset.index = String(index);
   approveButton.className = "inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700";
-  approveButton.textContent = "✅ Approve";
+  approveButton.textContent = "✅ Утвердить";
 
   const rejectButton = document.createElement("button");
   rejectButton.type = "button";
   rejectButton.dataset.action = "reject";
   rejectButton.dataset.index = String(index);
   rejectButton.className = "inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700";
-  rejectButton.textContent = "❌ Reject";
+  rejectButton.textContent = "❌ Отклонить";
 
   const editButton = document.createElement("button");
   editButton.type = "button";
   editButton.dataset.action = "edit";
   editButton.dataset.index = String(index);
   editButton.className = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100";
-  editButton.textContent = item.isEditing ? "💾 Save" : "✏️ Edit";
+  editButton.textContent = item.isEditing ? "💾 Сохранить" : "✏️ Редактировать";
 
   buttons.append(approveButton, rejectButton, editButton);
   wrapper.append(textBlock, statusLine, buttons);
@@ -107,7 +107,7 @@ export function renderAnalysisCard(item, index) {
 
   const badge = document.createElement("p");
   badge.className = `mb-2 text-xs font-semibold ${weak ? "text-rose-700" : "text-emerald-700"}`;
-  badge.textContent = weak ? "❌ Weakness" : "✅ Strength";
+  badge.textContent = weak ? "❌ Слабая сторона" : "✅ Сильная сторона";
 
   const textBlock = document.createElement("div");
   textBlock.className = "min-h-20 rounded-lg border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800";
@@ -127,14 +127,14 @@ export function renderAnalysisCard(item, index) {
   toggleButton.dataset.action = "toggle";
   toggleButton.dataset.index = String(index);
   toggleButton.className = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100";
-  toggleButton.textContent = weak ? "Mark Strength" : "Mark Weakness";
+  toggleButton.textContent = weak ? "Пометить как сильную" : "Пометить как слабую";
 
   const editButton = document.createElement("button");
   editButton.type = "button";
   editButton.dataset.action = "edit";
   editButton.dataset.index = String(index);
   editButton.className = "inline-flex items-center justify-center rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800";
-  editButton.textContent = item.isEditing ? "💾 Save" : "✏️ Edit";
+  editButton.textContent = item.isEditing ? "💾 Сохранить" : "✏️ Редактировать";
 
   buttons.append(toggleButton, editButton);
   wrapper.append(badge, textBlock, buttons);

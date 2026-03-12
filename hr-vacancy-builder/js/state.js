@@ -33,7 +33,7 @@ export function saveState(showError = null) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (_error) {
     if (typeof showError === "function") {
-      showError("Cannot save your progress to localStorage. Please free storage and retry.");
+      showError("Не удалось сохранить прогресс в localStorage. Освободите место и повторите попытку.");
     }
   }
 }

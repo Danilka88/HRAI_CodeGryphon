@@ -77,7 +77,7 @@ async function generateRequirements() {
   const model = dom.modelSelect.value || DEFAULT_MODEL;
 
   if (!query) {
-    showError("Please enter a job request before generating requirements.");
+    showError("Введите запрос вакансии перед генерацией требований.");
     return;
   }
 
@@ -99,9 +99,9 @@ async function generateRequirements() {
     setCurrentScreen("cards");
     renderCurrentScreen();
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error.";
+    const msg = error instanceof Error ? error.message : "Неизвестная ошибка.";
     derror("ollama response", "error", msg);
-    showError(`Failed to connect to local Ollama. ${msg}`, () => {
+    showError(`Не удалось подключиться к локальной Ollama. ${msg}`, () => {
       generateRequirements();
     });
   } finally {
@@ -172,7 +172,7 @@ function onCardsGridClick(event) {
     const editable = dom.cardsGrid.querySelector(`[data-role="card-text"][data-index="${index}"]`);
     const updatedText = editable ? editable.textContent.trim() : "";
     if (!updatedText) {
-      showError("Requirement text cannot be empty.");
+      showError("Текст требования не может быть пустым.");
       return;
     }
 
@@ -196,7 +196,7 @@ function onCreateDocument() {
   hideError();
   const approvedCount = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).length;
   if (!approvedCount) {
-    showError("Approve at least one requirement to create a document.");
+    showError("Утвердите хотя бы одно требование, чтобы создать документ.");
     return;
   }
 
@@ -221,24 +221,24 @@ function onBackToPreview() {
 function onDownload() {
   const markdown = getLastMarkdown();
   if (!markdown.trim()) {
-    showError("Nothing to download. Please generate the document first.");
+    showError("Нечего скачивать. Сначала сформируйте документ.");
     return;
   }
 
-  const filename = `${sanitizeFilename(state.query || "vacancy")}-requirements.md`;
+  const filename = `${sanitizeFilename(state.query || "vakansiya")}-requirements.md`;
   dlog("download", "requirements", filename, "chars", markdown.length);
   downloadMarkdown(filename, markdown);
 }
 
 function onDownloadAnalysis() {
   if (!state.analysisItems.length) {
-    showError("Nothing to download. Please run resume comparison first.");
+    showError("Нечего скачивать. Сначала выполните сравнение резюме.");
     return;
   }
 
   const markdown = buildAnalysisMarkdown(state);
   setLastAnalysisMarkdown(markdown);
-  const filename = `${sanitizeFilename(state.query || "vacancy")}-analysis.md`;
+  const filename = `${sanitizeFilename(state.query || "vakansiya")}-analysis.md`;
   dlog("download", "analysis", filename, "chars", markdown.length);
   downloadMarkdown(filename, markdown);
 }

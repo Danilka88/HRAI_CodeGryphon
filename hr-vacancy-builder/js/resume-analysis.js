@@ -18,7 +18,7 @@ function readFileAsText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(new Error("Cannot read file."));
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
     reader.readAsText(file);
   });
 }
@@ -27,7 +27,7 @@ function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(new Error("Cannot read file."));
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
     reader.readAsDataURL(file);
   });
 }
@@ -51,18 +51,18 @@ export async function onResumeFile(file, dom) {
       dom.pdfPreview.src = dataUrl;
       dom.pdfPreviewWrap.classList.remove("hidden");
       dlog("upload", "pdf preview ready", file.name);
-      showError("PDF preview loaded. Please paste resume text manually for analysis.");
+      showError("PDF загружен для предпросмотра. Для анализа вставьте текст резюме вручную.");
       return;
     }
 
     resetPdfPreview();
     if (!isText) {
-      throw new Error("Unsupported file type. Please use .txt, .md, or .pdf.");
+      throw new Error("Неподдерживаемый тип файла. Используйте .txt, .md или .pdf.");
     }
 
     const text = (await readFileAsText(file)).replace(/\r/g, "").trim();
     if (!text) {
-      throw new Error("Uploaded file is empty.");
+      throw new Error("Загруженный файл пуст.");
     }
 
     state.resumeText = text;
@@ -70,7 +70,7 @@ export async function onResumeFile(file, dom) {
     dom.resumeInput.value = text;
     dlog("upload", "text loaded", "chars", text.length);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Cannot process uploaded file.";
+    const msg = error instanceof Error ? error.message : "Не удалось обработать загруженный файл.";
     derror("upload", "error", msg);
     showError(msg);
   }
@@ -87,12 +87,12 @@ export async function compareResumeWithRequirements() {
     .map((item) => item.text);
 
   if (!requirements.length) {
-    showError("No approved requirements found. Please create a document first.");
+    showError("Нет утвержденных требований. Сначала сформируйте документ.");
     return;
   }
 
   if (!resumeText) {
-    showError("Please paste resume text (or upload .txt/.md) before comparison.");
+    showError("Вставьте текст резюме (или загрузите .txt/.md) перед сравнением.");
     return;
   }
 
@@ -113,9 +113,9 @@ export async function compareResumeWithRequirements() {
     dlog("analysis", "parsed items", parsed.length);
     renderAnalysisScreen();
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error.";
+    const msg = error instanceof Error ? error.message : "Неизвестная ошибка.";
     derror("analysis", "error", msg);
-    showError(`Failed to analyze resume with local Ollama. ${msg}`, () => {
+    showError(`Не удалось выполнить анализ резюме через локальную Ollama. ${msg}`, () => {
       compareResumeWithRequirements();
     });
   } finally {
@@ -168,7 +168,7 @@ export function onAnalysisGridClick(event, dom) {
     const editable = dom.analysisGrid.querySelector(`[data-role="analysis-text"][data-index="${index}"]`);
     const updatedText = editable ? editable.textContent.trim() : "";
     if (!updatedText) {
-      showError("Analysis card text cannot be empty.");
+      showError("Текст карточки анализа не может быть пустым.");
       return;
     }
 

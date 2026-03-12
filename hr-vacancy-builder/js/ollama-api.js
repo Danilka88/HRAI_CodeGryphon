@@ -48,7 +48,7 @@ async function callOllamaGenerate(prompt, model, tag) {
       });
 
       if (!response.ok) {
-        throw new Error(`Ollama returned HTTP ${response.status}.`);
+        throw new Error(`Ollama вернула HTTP ${response.status}.`);
       }
 
       const data = await response.json();
@@ -59,42 +59,48 @@ async function callOllamaGenerate(prompt, model, tag) {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error?.name === "AbortError") {
-        lastError = new Error("Request timed out after 180 seconds.");
+        lastError = new Error("Превышено время ожидания: 180 секунд.");
       } else if (error instanceof Error) {
         lastError = error;
       } else {
-        lastError = new Error("Unknown network error.");
+        lastError = new Error("Неизвестная сетевая ошибка.");
       }
       dwarn("ollama response", tag, "error", lastError.message, "host", host);
     }
   }
 
-  throw lastError || new Error("Please ensure Ollama is running on localhost:11434.");
+  throw lastError || new Error("Убедитесь, что Ollama запущена на localhost:11434.");
 }
 
 // ─── SECTION: Prompt Builders ───
 function buildRequirementsPrompt(query) {
   return [
-    "You are an HR requirement extraction engine.",
-    "Return ONLY candidate requirements for the vacancy request.",
-    "Output format MUST be plain text with requirements separated strictly by three semicolons: ;;;",
-    "No numbering, no bullets, no JSON, no explanations, no extra words before or after.",
-    "Each requirement must be short, specific, and job-relevant.",
-    `Vacancy request: ${query}`
+    "Ты — эксперт по требованиям к вакансиям.",
+    "Верни ТОЛЬКО список требований к кандидату для указанной вакансии.",
+    "Формат: каждое требование отделяется строго тремя точками с запятой ;;;",
+    "Никакого другого текста, номеров, JSON, пояснений, вступлений и окончаний.",
+    "Пример: Требование 1;;;Требование 2;;;Требование 3",
+    "",
+    `Вакансия: ${query}`
   ].join("\n");
 }
 
 function buildResumeAnalysisPrompt(requirements, resumeText) {
   return [
-    "You are an HR analyst. Compare the resume below with the vacancy requirements.",
-    "Return ONLY a list of STRENGTHS and WEAKNESSES, separated strictly by three semicolons (;;;).",
-    "Format: Strength: [text];;;Weakness: [text];;;Strength: [text];;; etc.",
-    "No extra words, no JSON, no explanations.",
-    "Vacancy requirements:",
+    "Ты — HR-аналитик.",
+    "Сравни резюме кандидата с требованиями вакансии.",
+    "Верни ТОЛЬКО список сильных и слабых сторон в формате:",
+    "",
+    "Сильная сторона: [текст];;;Слабая сторона: [текст];;;Сильная сторона: [текст];;;",
+    "",
+    "Никаких других слов, заголовков, пояснений, нумерации, JSON. Только пункты через ;;;",
+    "",
+    "Требования вакансии:",
     requirements.map((item, idx) => `${idx + 1}. ${item}`).join("\n"),
-    "Resume:",
+    "",
+    "Резюме кандидата:",
     resumeText
-  ].join("\n\n");
+  ].join("\n");
 }
 
 // ─── SECTION: Public API ───
