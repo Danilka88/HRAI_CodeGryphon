@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HR Vacancy Builder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    [contenteditable="true"]:focus {
+      outline: 2px solid rgb(59 130 246 / 0.35);
+      outline-offset: 2px;
+    }
+
+    .card-transition {
+      transition: all 0.2s ease;
+    }
+
+    .markdown-preview {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 antialiased">
+  <div id="app" class="min-h-screen">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <h1 class="text-lg font-semibold sm:text-xl">HR Vacancy Requirement Builder</h1>
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">Local Ollama</span>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <section id="globalError"
+        class="hidden mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="text-sm font-semibold">Something went wrong</p>
+            <p id="globalErrorMessage" class="mt-1 text-sm leading-relaxed"></p>
+          </div>
+          <button id="retryButton" type="button"
+            class="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
+            Retry
+          </button>
+        </div>
+      </section>
+
+      <section id="screenInput" class="flex flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-xl font-semibold">1) Enter a job request</h2>
+          <p class="mt-2 text-sm text-slate-600">
+            Example: <span class="font-medium">Pediatric Dentist for a children’s clinic</span>
+          </p>
+
+          <label for="queryInput" class="mt-5 block text-sm font-medium text-slate-700">Job request</label>
+          <textarea id="queryInput" rows="4" placeholder="Type the vacancy request here..."
+            class="mt-2 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"></textarea>
+
+          <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="modelSelect" class="block text-sm font-medium text-slate-700">Ollama model</label>
+              <select id="modelSelect"
+                class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                <option value="qwen2.5:7b">qwen2.5:7b</option>
+                <option value="qwen2.5:14b">qwen2.5:14b</option>
+                <option value="qwen3.5:4b">qwen3.5:4b</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button id="generateButton" type="button"
+                class="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300">
+                Generate Requirements
+              </button>
+            </div>
+          </div>
+
+          <div id="inputHint" class="mt-4 text-xs text-slate-500">
+            Your data stays in browser localStorage only.
+          </div>
+        </div>
+      </section>
+
+      <section id="screenCards" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">2) Review and edit requirements</h2>
+              <p class="mt-1 text-sm text-slate-600">Approve, reject, or edit each requirement before generating the
+                document.</p>
+            </div>
+            <div class="text-xs text-slate-500">
+              <span id="cardsMetaCount">0</span> items total
+            </div>
+          </div>
+
+          <div id="cardsGrid" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button id="backToInputButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Back
+            </button>
+            <button id="createDocumentButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300">
+              Create Document
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screenPreview" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-xl font-semibold">3) Final Markdown preview</h2>
+          <p class="mt-2 text-sm text-slate-600">Download a clean .md document and share it with recruiters or hiring
+            managers.</p>
+
+          <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <pre id="markdownPreview" class="markdown-preview text-sm leading-relaxed text-slate-800"></pre>
+          </div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button id="downloadButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+              Download .md
+            </button>
+            <button id="nextToAnalysisButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2">
+              Next: Analyze Candidate Resume
+            </button>
+            <button id="startOverButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Start Over
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screenAnalysis" class="hidden flex-col gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">4) Resume Analysis</h2>
+              <p class="mt-1 text-sm text-slate-600">Paste resume text or upload/drop a file, then compare it with your
+                approved requirements.</p>
+            </div>
+            <div class="text-xs text-slate-500"><span id="analysisMetaCount">0</span> analysis cards</div>
+          </div>
+
+          <label for="resumeInput" class="mt-5 block text-sm font-medium text-slate-700">Resume text</label>
+          <textarea id="resumeInput" rows="10" placeholder="Paste candidate resume text here..."
+            class="mt-2 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"></textarea>
+
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div id="resumeDropzone"
+              class="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 transition">
+              <p class="font-medium text-slate-700">Drop .txt / .md / .pdf here</p>
+              <p class="mt-1 text-xs">Or click to upload. TXT/MD are parsed automatically. PDF preview only — paste text manually.</p>
+              <input id="resumeFile" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
+                class="hidden" />
+            </div>
+            <div id="pdfPreviewWrap" class="hidden rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <embed id="pdfPreview" type="application/pdf" class="h-44 w-full rounded-lg" />
+            </div>
+          </div>
+
+          <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button id="compareButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300">
+              Compare Resume with Requirements
+            </button>
+            <button id="downloadAnalysisButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300">
+              Download Analysis.md
+            </button>
+          </div>
+
+          <div id="analysisGrid" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button id="backToPreviewButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Back to Preview
+            </button>
+            <button id="analysisStartOverButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+              Start Over
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ─── 1. Constants & Config ───
+    const OLLAMA_URL = "http://localhost:11434";
+    const STORAGE_KEY = "hr-vacancy-builder";
+    const DEFAULT_MODEL = "qwen3.5:4b";
+    const FALLBACK_OLLAMA_URL = "http://127.0.0.1:11434";
+    const GENERATE_TIMEOUT_MS = 180000;
+    const DEBUG = true;
+    const LOG_PREFIX = "[HR-VB]";
+    const dlog = (...args) => DEBUG && console.log(LOG_PREFIX, ...args);
+    const dwarn = (...args) => DEBUG && console.warn(LOG_PREFIX, ...args);
+    const derror = (...args) => DEBUG && console.error(LOG_PREFIX, ...args);
+
+    // ─── 2. State Management (localStorage wrapper) ───
+    let state = { query: "", model: "", items: [], resumeText: "", analysisItems: [], version: 1 };
+    let currentScreen = "input";
+    let lastMarkdown = "";
+    let lastAnalysisMarkdown = "";
+    let lastErrorRetryAction = null;
+
+    // ─── 3. DOM References (cache important elements) ───
+    const dom = {
+      screenInput: document.getElementById("screenInput"),
+      screenCards: document.getElementById("screenCards"),
+      screenPreview: document.getElementById("screenPreview"),
+      screenAnalysis: document.getElementById("screenAnalysis"),
+      queryInput: document.getElementById("queryInput"),
+      modelSelect: document.getElementById("modelSelect"),
+      generateButton: document.getElementById("generateButton"),
+      inputHint: document.getElementById("inputHint"),
+      cardsMetaCount: document.getElementById("cardsMetaCount"),
+      cardsGrid: document.getElementById("cardsGrid"),
+      backToInputButton: document.getElementById("backToInputButton"),
+      createDocumentButton: document.getElementById("createDocumentButton"),
+      markdownPreview: document.getElementById("markdownPreview"),
+      downloadButton: document.getElementById("downloadButton"),
+      nextToAnalysisButton: document.getElementById("nextToAnalysisButton"),
+      startOverButton: document.getElementById("startOverButton"),
+      resumeInput: document.getElementById("resumeInput"),
+      resumeFile: document.getElementById("resumeFile"),
+      resumeDropzone: document.getElementById("resumeDropzone"),
+      pdfPreviewWrap: document.getElementById("pdfPreviewWrap"),
+      pdfPreview: document.getElementById("pdfPreview"),
+      compareButton: document.getElementById("compareButton"),
+      analysisMetaCount: document.getElementById("analysisMetaCount"),
+      analysisGrid: document.getElementById("analysisGrid"),
+      backToPreviewButton: document.getElementById("backToPreviewButton"),
+      downloadAnalysisButton: document.getElementById("downloadAnalysisButton"),
+      analysisStartOverButton: document.getElementById("analysisStartOverButton"),
+      globalError: document.getElementById("globalError"),
+      globalErrorMessage: document.getElementById("globalErrorMessage"),
+      retryButton: document.getElementById("retryButton")
+    };
+
+    // ─── 4. Utility Functions ───
+    function splitDelimitedUnique(raw, logTag) {
+      if (typeof raw !== "string") {
+        throw new Error("Model response is not text.");
+      }
+
+      const normalized = raw.replace(/\r/g, "").trim();
+      dlog(logTag, "raw length", normalized.length);
+      if (!normalized) {
+        throw new Error("Model returned an empty response.");
+      }
+
+      const parts = normalized
+        .split(";;;")
+        .map((part) => part.trim())
+        .map((part) => part.replace(/^[-*\d.)\s]+/g, "").replace(/^"|"$/g, "").trim())
+        .filter(Boolean);
+
+      const unique = [];
+      const seen = new Set();
+      for (const item of parts) {
+        const key = item.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(item);
+        }
+      }
+
+      dlog(logTag, "parsed items", unique.length);
+      if (!unique.length) {
+        throw new Error("Model response does not contain valid requirements separated by ;;;.");
+      }
+
+      return unique;
+    }
+
+    function parseOllamaResponse(raw) {
+      return splitDelimitedUnique(raw, "parse").map((text, idx) => ({
+        id: `req-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+        text,
+        status: "approved",
+        isEditing: false
+      }));
+    }
+
+    function parseAnalysisResponse(raw) {
+      return splitDelimitedUnique(raw, "analysis parse").map((line, idx) => {
+        const match = line.match(/^(strength|weakness)\s*:\s*(.+)$/i);
+        const type = match ? match[1].toLowerCase() : /^weak/i.test(line) ? "weakness" : "strength";
+        const text = (match ? match[2] : line.replace(/^(strength|weakness)\s*:\s*/i, "")).trim();
+        if (!text) {
+          throw new Error("Analysis item text is empty.");
+        }
+        return {
+          id: `analysis-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+          type: type === "weakness" ? "weakness" : "strength",
+          text,
+          isEditing: false
+        };
+      });
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (_error) {
+        showError("Cannot save your progress to localStorage. Please free storage and retry.");
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          state.model = DEFAULT_MODEL;
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+        const nextState = {
+          query: typeof parsed?.query === "string" ? parsed.query : "",
+          model: typeof parsed?.model === "string" && parsed.model ? parsed.model : DEFAULT_MODEL,
+          items: Array.isArray(parsed?.items)
+            ? parsed.items
+              .filter((item) => item && typeof item.text === "string")
+              .map((item, idx) => ({
+                id: typeof item.id === "string" ? item.id : `saved-${idx}-${Date.now()}`,
+                text: item.text.trim(),
+                status: item.status === "rejected" ? "rejected" : "approved",
+                isEditing: false
+              }))
+              .filter((item) => item.text)
+            : [],
+          resumeText: typeof parsed?.resumeText === "string" ? parsed.resumeText : "",
+          analysisItems: Array.isArray(parsed?.analysisItems)
+            ? parsed.analysisItems
+              .filter((item) => item && typeof item.text === "string")
+              .map((item, idx) => ({
+                id: typeof item.id === "string" ? item.id : `analysis-saved-${idx}-${Date.now()}`,
+                type: item.type === "weakness" ? "weakness" : "strength",
+                text: item.text.trim(),
+                isEditing: false
+              }))
+              .filter((item) => item.text)
+            : [],
+          version: 1
+        };
+
+        state = nextState;
+      } catch (_error) {
+        state = { query: "", model: DEFAULT_MODEL, items: [], resumeText: "", analysisItems: [], version: 1 };
+        saveState();
+      }
+    }
+
+    function escapeMarkdown(text) {
+      return text.replace(/[\\`*_{}\[\]()#+\-.!|>]/g, "\\$&");
+    }
+
+    function buildMarkdown() {
+      const approvedItems = state.items.filter((item) => item.status !== "rejected" && item.text.trim());
+      const titleQuery = state.query.trim() || "Untitled Vacancy";
+      const lines = [
+        `# Vacancy Requirements: ${titleQuery}`,
+        "",
+        `Generated with model **${state.model || DEFAULT_MODEL}** via local Ollama.`,
+        "",
+        "## Candidate Requirements",
+        ""
+      ];
+
+      if (!approvedItems.length) {
+        lines.push("- _No approved requirements available._");
+      } else {
+        approvedItems.forEach((item) => {
+          lines.push(`- ${escapeMarkdown(item.text)}`);
+        });
+      }
+
+      return lines.join("\n");
+    }
+
+    function buildAnalysisMarkdown() {
+      const titleQuery = state.query.trim() || "Untitled Vacancy";
+      const approvedItems = state.items.filter((item) => item.status !== "rejected" && item.text.trim());
+      const strengths = state.analysisItems.filter((item) => item.type === "strength" && item.text.trim());
+      const weaknesses = state.analysisItems.filter((item) => item.type === "weakness" && item.text.trim());
+      const lines = [
+        `# Resume Analysis: ${titleQuery}`,
+        "",
+        `Generated with model **${state.model || DEFAULT_MODEL}** via local Ollama.`,
+        "",
+        "## Requirements Summary",
+        ""
+      ];
+
+      if (!approvedItems.length) {
+        lines.push("- _No approved requirements available._");
+      } else {
+        approvedItems.forEach((item) => lines.push(`- ${escapeMarkdown(item.text)}`));
+      }
+
+      lines.push("", "## Strengths", "");
+      if (!strengths.length) {
+        lines.push("- _No strengths detected._");
+      } else {
+        strengths.forEach((item) => lines.push(`- ${escapeMarkdown(item.text)}`));
+      }
+
+      lines.push("", "## Weaknesses", "");
+      if (!weaknesses.length) {
+        lines.push("- _No weaknesses detected._");
+      } else {
+        weaknesses.forEach((item) => lines.push(`- ${escapeMarkdown(item.text)}`));
+      }
+
+      return lines.join("\n");
+    }
+
+    function downloadMarkdown(filename, content) {
+      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function hideError() {
+      dom.globalError.classList.add("hidden");
+      dom.globalErrorMessage.textContent = "";
+      lastErrorRetryAction = null;
+      dom.retryButton.classList.add("hidden");
+    }
+
+    function showError(message, retryAction = null) {
+      dom.globalErrorMessage.textContent = message;
+      dom.globalError.classList.remove("hidden");
+      lastErrorRetryAction = typeof retryAction === "function" ? retryAction : null;
+      dom.retryButton.classList.toggle("hidden", !lastErrorRetryAction);
+    }
+
+    function setGenerating(isGenerating) {
+      dom.generateButton.disabled = isGenerating;
+      dom.generateButton.textContent = isGenerating ? "Generating..." : "Generate Requirements";
+      dom.inputHint.textContent = isGenerating
+        ? "Waiting for local Ollama response (up to 180 seconds)..."
+        : "Your data stays in browser localStorage only.";
+    }
+
+    function setComparing(isComparing) {
+      dom.compareButton.disabled = isComparing;
+      dom.compareButton.textContent = isComparing ? "Comparing..." : "Compare Resume with Requirements";
+    }
+
+    function getCandidateHosts() {
+      const hosts = [OLLAMA_URL];
+      if (OLLAMA_URL !== FALLBACK_OLLAMA_URL) {
+        hosts.push(FALLBACK_OLLAMA_URL);
+      }
+      return hosts;
+    }
+
+    function sanitizeFilename(value) {
+      return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60) || "vacancy-requirements";
+    }
+
+    async function callOllamaGenerate(prompt, model, tag) {
+      const payload = {
+        model,
+        prompt,
+        stream: false,
+        options: {
+          temperature: 0.2,
+          top_p: 0.9
+        }
+      };
+
+      let lastError = null;
+      const hosts = getCandidateHosts();
+
+      dlog("ollama call", tag, "starting", "model", model, "hosts", hosts.length);
+      for (const host of hosts) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
+
+        try {
+          const response = await fetch(`${host}/api/generate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+
+          if (!response.ok) {
+            throw new Error(`Ollama returned HTTP ${response.status}.`);
+          }
+
+          const data = await response.json();
+          const outputText = typeof data?.response === "string" ? data.response : "";
+          clearTimeout(timeoutId);
+          dlog("ollama response", tag, "success", "host", host, "chars", outputText.length);
+          return outputText;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error?.name === "AbortError") {
+            lastError = new Error("Request timed out after 180 seconds.");
+          } else if (error instanceof Error) {
+            lastError = error;
+          } else {
+            lastError = new Error("Unknown network error.");
+          }
+          dwarn("ollama response", tag, "error", lastError.message, "host", host);
+        }
+      }
+
+      throw lastError || new Error("Please ensure Ollama is running on localhost:11434.");
+    }
+
+    function readFileAsText(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(new Error("Cannot read file."));
+        reader.readAsText(file);
+      });
+    }
+
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(new Error("Cannot read file."));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function resetPdfPreview() {
+      dom.pdfPreview.removeAttribute("src");
+      dom.pdfPreviewWrap.classList.add("hidden");
+    }
+
+    // ─── 5. API Interaction ───
+    async function generateRequirements() {
+      hideError();
+
+      const query = dom.queryInput.value.trim();
+      const model = dom.modelSelect.value || DEFAULT_MODEL;
+
+      if (!query) {
+        showError("Please enter a job request before generating requirements.");
+        return;
+      }
+
+      state.query = query;
+      state.model = model;
+      saveState();
+      dlog("generate", "starting", "query", query, "model", model);
+
+      const strictPrompt = [
+        "You are an HR requirement extraction engine.",
+        "Return ONLY candidate requirements for the vacancy request.",
+        "Output format MUST be plain text with requirements separated strictly by three semicolons: ;;;",
+        "No numbering, no bullets, no JSON, no explanations, no extra words before or after.",
+        "Each requirement must be short, specific, and job-relevant.",
+        `Vacancy request: ${query}`
+      ].join("\n");
+
+      setGenerating(true);
+
+      try {
+        const outputText = await callOllamaGenerate(strictPrompt, model, "requirements");
+        const items = parseOllamaResponse(outputText);
+        state.items = items;
+        state.analysisItems = [];
+        saveState();
+        dlog("ollama response", "success", "items", items.length);
+
+        currentScreen = "cards";
+        renderCurrentScreen();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Unknown error.";
+        derror("ollama response", "error", msg);
+        showError(`Failed to connect to local Ollama. ${msg}`, () => {
+          generateRequirements();
+        });
+      } finally {
+        setGenerating(false);
+      }
+    }
+
+    async function compareResumeWithRequirements() {
+      hideError();
+
+      const resumeText = dom.resumeInput.value.trim();
+      const model = state.model || dom.modelSelect.value || DEFAULT_MODEL;
+      const requirements = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).map((item) => item.text);
+
+      if (!requirements.length) {
+        showError("No approved requirements found. Please create a document first.");
+        return;
+      }
+
+      if (!resumeText) {
+        showError("Please paste resume text (or upload .txt/.md) before comparison.");
+        return;
+      }
+
+      state.resumeText = resumeText;
+      state.model = model;
+      saveState();
+      dlog("analysis", "starting", "resume chars", resumeText.length, "requirements", requirements.length, "model", model);
+
+      const strictPrompt = [
+        "You are an HR analyst. Compare the resume below with the vacancy requirements.",
+        "Return ONLY a list of STRENGTHS and WEAKNESSES, separated strictly by three semicolons (;;;).",
+        "Format: Strength: [text];;;Weakness: [text];;;Strength: [text];;; etc.",
+        "No extra words, no JSON, no explanations.",
+        "Vacancy requirements:",
+        requirements.map((item, idx) => `${idx + 1}. ${item}`).join("\n"),
+        "Resume:",
+        resumeText
+      ].join("\n\n");
+
+      setComparing(true);
+
+      try {
+        const outputText = await callOllamaGenerate(strictPrompt, model, "analysis");
+        const parsed = parseAnalysisResponse(outputText);
+        state.analysisItems = parsed;
+        saveState();
+        dlog("analysis", "parsed items", parsed.length);
+        renderAnalysisScreen();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Unknown error.";
+        derror("analysis", "error", msg);
+        showError(`Failed to analyze resume with local Ollama. ${msg}`, () => {
+          compareResumeWithRequirements();
+        });
+      } finally {
+        setComparing(false);
+      }
+    }
+
+    // ─── 6. UI Rendering Functions ───
+    function renderInputScreen() {
+      dom.screenInput.classList.remove("hidden");
+      dom.screenInput.classList.add("flex");
+      dom.screenCards.classList.add("hidden");
+      dom.screenPreview.classList.add("hidden");
+      dom.screenAnalysis.classList.add("hidden");
+
+      dom.queryInput.value = state.query || "";
+      dom.modelSelect.value = state.model || DEFAULT_MODEL;
+      setGenerating(false);
+    }
+
+    function renderCard(item, index) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "card-transition rounded-xl border bg-white p-4 shadow-sm";
+
+      if (item.status === "rejected") {
+        wrapper.classList.add("border-rose-300", "bg-rose-50");
+      } else {
+        wrapper.classList.add("border-slate-200");
+      }
+
+      const textBlock = document.createElement("div");
+      textBlock.className = "min-h-20 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800";
+      textBlock.contentEditable = item.isEditing ? "true" : "false";
+      textBlock.textContent = item.text;
+      textBlock.dataset.index = String(index);
+      textBlock.dataset.role = "card-text";
+      if (!item.isEditing) {
+        textBlock.classList.add("select-text");
+      }
+
+      const statusLine = document.createElement("p");
+      statusLine.className = "mt-2 text-xs font-medium";
+      statusLine.textContent = item.status === "rejected" ? "Rejected" : "Approved";
+      statusLine.classList.add(item.status === "rejected" ? "text-rose-700" : "text-emerald-700");
+
+      const buttons = document.createElement("div");
+      buttons.className = "mt-3 flex flex-wrap gap-2";
+
+      const approveButton = document.createElement("button");
+      approveButton.type = "button";
+      approveButton.dataset.action = "approve";
+      approveButton.dataset.index = String(index);
+      approveButton.className = "inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700";
+      approveButton.textContent = "✅ Approve";
+
+      const rejectButton = document.createElement("button");
+      rejectButton.type = "button";
+      rejectButton.dataset.action = "reject";
+      rejectButton.dataset.index = String(index);
+      rejectButton.className = "inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700";
+      rejectButton.textContent = "❌ Reject";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.dataset.action = "edit";
+      editButton.dataset.index = String(index);
+      editButton.className = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100";
+      editButton.textContent = item.isEditing ? "💾 Save" : "✏️ Edit";
+
+      buttons.append(approveButton, rejectButton, editButton);
+      wrapper.append(textBlock, statusLine, buttons);
+      return wrapper;
+    }
+
+    function renderAnalysisCard(item, index) {
+      const weak = item.type === "weakness";
+      const wrapper = document.createElement("div");
+      wrapper.className = `card-transition rounded-xl border p-4 shadow-sm ${weak ? "border-rose-300 bg-rose-50" : "border-emerald-300 bg-emerald-50"}`;
+
+      const badge = document.createElement("p");
+      badge.className = `mb-2 text-xs font-semibold ${weak ? "text-rose-700" : "text-emerald-700"}`;
+      badge.textContent = weak ? "❌ Weakness" : "✅ Strength";
+
+      const textBlock = document.createElement("div");
+      textBlock.className = "min-h-20 rounded-lg border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800";
+      textBlock.contentEditable = item.isEditing ? "true" : "false";
+      textBlock.textContent = item.text;
+      textBlock.dataset.role = "analysis-text";
+      textBlock.dataset.index = String(index);
+      if (!item.isEditing) {
+        textBlock.classList.add("select-text");
+      }
+
+      const buttons = document.createElement("div");
+      buttons.className = "mt-3 flex flex-wrap gap-2";
+
+      const toggleButton = document.createElement("button");
+      toggleButton.type = "button";
+      toggleButton.dataset.action = "toggle";
+      toggleButton.dataset.index = String(index);
+      toggleButton.className = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100";
+      toggleButton.textContent = weak ? "Mark Strength" : "Mark Weakness";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.dataset.action = "edit";
+      editButton.dataset.index = String(index);
+      editButton.className = "inline-flex items-center justify-center rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800";
+      editButton.textContent = item.isEditing ? "💾 Save" : "✏️ Edit";
+
+      buttons.append(toggleButton, editButton);
+      wrapper.append(badge, textBlock, buttons);
+      return wrapper;
+    }
+
+    function renderCardsScreen() {
+      dom.screenInput.classList.add("hidden");
+      dom.screenCards.classList.remove("hidden");
+      dom.screenCards.classList.add("flex");
+      dom.screenPreview.classList.add("hidden");
+      dom.screenAnalysis.classList.add("hidden");
+
+      dom.cardsGrid.innerHTML = "";
+      state.items.forEach((item, index) => {
+        dom.cardsGrid.appendChild(renderCard(item, index));
+      });
+
+      dom.cardsMetaCount.textContent = String(state.items.length);
+      dom.createDocumentButton.disabled = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).length === 0;
+    }
+
+    function renderPreviewScreen() {
+      dom.screenInput.classList.add("hidden");
+      dom.screenCards.classList.add("hidden");
+      dom.screenPreview.classList.remove("hidden");
+      dom.screenPreview.classList.add("flex");
+      dom.screenAnalysis.classList.add("hidden");
+
+      lastMarkdown = buildMarkdown();
+      dom.markdownPreview.textContent = lastMarkdown;
+    }
+
+    function renderAnalysisScreen() {
+      dom.screenInput.classList.add("hidden");
+      dom.screenCards.classList.add("hidden");
+      dom.screenPreview.classList.add("hidden");
+      dom.screenAnalysis.classList.remove("hidden");
+      dom.screenAnalysis.classList.add("flex");
+
+      dom.resumeInput.value = state.resumeText || "";
+      dom.analysisGrid.innerHTML = "";
+      state.analysisItems.forEach((item, index) => {
+        dom.analysisGrid.appendChild(renderAnalysisCard(item, index));
+      });
+      dom.analysisMetaCount.textContent = String(state.analysisItems.length);
+      dom.downloadAnalysisButton.disabled = !state.analysisItems.length;
+      setComparing(false);
+    }
+
+    function renderCurrentScreen() {
+      if (currentScreen === "cards") {
+        renderCardsScreen();
+        return;
+      }
+
+      if (currentScreen === "preview") {
+        renderPreviewScreen();
+        return;
+      }
+
+      if (currentScreen === "analysis") {
+        renderAnalysisScreen();
+        return;
+      }
+
+      renderInputScreen();
+    }
+
+    // ─── 7. Event Handlers ───
+    function onGenerate() {
+      generateRequirements();
+    }
+
+    function onCardsGridClick(event) {
+      const target = event.target.closest("button[data-action]");
+      if (!target) {
+        return;
+      }
+
+      const index = Number(target.dataset.index);
+      if (!Number.isInteger(index) || index < 0 || index >= state.items.length) {
+        return;
+      }
+
+      const action = target.dataset.action;
+      const item = state.items[index];
+
+      if (action === "approve") {
+        item.status = "approved";
+        saveState();
+        dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
+        renderCardsScreen();
+        return;
+      }
+
+      if (action === "reject") {
+        item.status = "rejected";
+        item.isEditing = false;
+        saveState();
+        dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
+        renderCardsScreen();
+        return;
+      }
+
+      if (action === "edit") {
+        if (!item.isEditing) {
+          state.items.forEach((card) => {
+            card.isEditing = false;
+          });
+          item.isEditing = true;
+          dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
+          renderCardsScreen();
+
+          const editable = dom.cardsGrid.querySelector(`[data-role="card-text"][data-index="${index}"]`);
+          if (editable) {
+            editable.focus();
+            document.execCommand("selectAll", false, null);
+            document.getSelection()?.collapseToEnd();
+          }
+          return;
+        }
+
+        const editable = dom.cardsGrid.querySelector(`[data-role="card-text"][data-index="${index}"]`);
+        const updatedText = editable ? editable.textContent.trim() : "";
+        if (!updatedText) {
+          showError("Requirement text cannot be empty.");
+          return;
+        }
+
+        item.text = updatedText;
+        item.status = "approved";
+        item.isEditing = false;
+        saveState();
+        dlog("card change", "index", index, "action", action, "new", { status: item.status, text: item.text });
+        renderCardsScreen();
+      }
+    }
+
+    function onAnalysisGridClick(event) {
+      const target = event.target.closest("button[data-action]");
+      if (!target) {
+        return;
+      }
+
+      const index = Number(target.dataset.index);
+      if (!Number.isInteger(index) || index < 0 || index >= state.analysisItems.length) {
+        return;
+      }
+
+      const action = target.dataset.action;
+      const item = state.analysisItems[index];
+
+      if (action === "toggle") {
+        item.type = item.type === "weakness" ? "strength" : "weakness";
+        item.isEditing = false;
+        saveState();
+        dlog("analysis card", "index", index, "action", action, "new", { type: item.type, text: item.text });
+        renderAnalysisScreen();
+        return;
+      }
+
+      if (action === "edit") {
+        if (!item.isEditing) {
+          state.analysisItems.forEach((card) => {
+            card.isEditing = false;
+          });
+          item.isEditing = true;
+          dlog("analysis card", "index", index, "action", action, "new", { type: item.type, text: item.text });
+          renderAnalysisScreen();
+
+          const editable = dom.analysisGrid.querySelector(`[data-role="analysis-text"][data-index="${index}"]`);
+          if (editable) {
+            editable.focus();
+            document.execCommand("selectAll", false, null);
+            document.getSelection()?.collapseToEnd();
+          }
+          return;
+        }
+
+        const editable = dom.analysisGrid.querySelector(`[data-role="analysis-text"][data-index="${index}"]`);
+        const updatedText = editable ? editable.textContent.trim() : "";
+        if (!updatedText) {
+          showError("Analysis card text cannot be empty.");
+          return;
+        }
+
+        item.text = updatedText;
+        item.isEditing = false;
+        saveState();
+        dlog("analysis card", "index", index, "action", action, "new", { type: item.type, text: item.text });
+        renderAnalysisScreen();
+      }
+    }
+
+    function onBackToInput() {
+      hideError();
+      currentScreen = "input";
+      renderCurrentScreen();
+    }
+
+    function onCreateDocument() {
+      hideError();
+      const approvedCount = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).length;
+      if (!approvedCount) {
+        showError("Approve at least one requirement to create a document.");
+        return;
+      }
+
+      dlog("document", "approved count", approvedCount);
+      currentScreen = "preview";
+      renderCurrentScreen();
+    }
+
+    function onNextToAnalysis() {
+      hideError();
+      currentScreen = "analysis";
+      dlog("analysis", "open screen", "cards", state.analysisItems.length);
+      renderCurrentScreen();
+    }
+
+    function onBackToPreview() {
+      hideError();
+      currentScreen = "preview";
+      renderCurrentScreen();
+    }
+
+    async function onResumeFile(file) {
+      if (!file) {
+        return;
+      }
+
+      hideError();
+      dlog("upload", "start", file.name, file.type || "unknown", file.size);
+      const name = file.name.toLowerCase();
+      const isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
+      const isText = file.type.startsWith("text/") || name.endsWith(".txt") || name.endsWith(".md");
+
+      try {
+        if (isPdf) {
+          const dataUrl = await readFileAsDataURL(file);
+          dom.pdfPreview.src = dataUrl;
+          dom.pdfPreviewWrap.classList.remove("hidden");
+          dlog("upload", "pdf preview ready", file.name);
+          showError("PDF preview loaded. Please paste resume text manually for analysis.");
+          return;
+        }
+
+        resetPdfPreview();
+        if (!isText) {
+          throw new Error("Unsupported file type. Please use .txt, .md, or .pdf.");
+        }
+
+        const text = (await readFileAsText(file)).replace(/\r/g, "").trim();
+        if (!text) {
+          throw new Error("Uploaded file is empty.");
+        }
+
+        state.resumeText = text;
+        saveState();
+        dom.resumeInput.value = text;
+        dlog("upload", "text loaded", "chars", text.length);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Cannot process uploaded file.";
+        derror("upload", "error", msg);
+        showError(msg);
+      }
+    }
+
+    function onCompareResume() {
+      compareResumeWithRequirements();
+    }
+
+    function onDownload() {
+      if (!lastMarkdown.trim()) {
+        showError("Nothing to download. Please generate the document first.");
+        return;
+      }
+
+      const filename = `${sanitizeFilename(state.query || "vacancy")}-requirements.md`;
+      dlog("download", "requirements", filename, "chars", lastMarkdown.length);
+      downloadMarkdown(filename, lastMarkdown);
+    }
+
+    function onDownloadAnalysis() {
+      if (!state.analysisItems.length) {
+        showError("Nothing to download. Please run resume comparison first.");
+        return;
+      }
+
+      lastAnalysisMarkdown = buildAnalysisMarkdown();
+      const filename = `${sanitizeFilename(state.query || "vacancy")}-analysis.md`;
+      dlog("download", "analysis", filename, "chars", lastAnalysisMarkdown.length);
+      downloadMarkdown(filename, lastAnalysisMarkdown);
+    }
+
+    function onStartOver() {
+      hideError();
+      state = { query: "", model: DEFAULT_MODEL, items: [], resumeText: "", analysisItems: [], version: 1 };
+      saveState();
+      lastMarkdown = "";
+      lastAnalysisMarkdown = "";
+      resetPdfPreview();
+      currentScreen = "input";
+      dlog("init", "start over");
+      renderCurrentScreen();
+    }
+
+    function onRetry() {
+      if (typeof lastErrorRetryAction === "function") {
+        hideError();
+        dlog("retry", "triggered");
+        lastErrorRetryAction();
+      }
+    }
+
+    // ─── 8. Init ───
+    document.addEventListener("DOMContentLoaded", () => {
+      loadState();
+      dlog("init", "loaded state", "items", state.items.length, "analysis", state.analysisItems.length, "resume chars", (state.resumeText || "").length);
+
+      dom.generateButton.addEventListener("click", onGenerate);
+      dom.cardsGrid.addEventListener("click", onCardsGridClick);
+      dom.backToInputButton.addEventListener("click", onBackToInput);
+      dom.createDocumentButton.addEventListener("click", onCreateDocument);
+      dom.downloadButton.addEventListener("click", onDownload);
+      dom.nextToAnalysisButton.addEventListener("click", onNextToAnalysis);
+      dom.startOverButton.addEventListener("click", onStartOver);
+      dom.compareButton.addEventListener("click", onCompareResume);
+      dom.analysisGrid.addEventListener("click", onAnalysisGridClick);
+      dom.backToPreviewButton.addEventListener("click", onBackToPreview);
+      dom.downloadAnalysisButton.addEventListener("click", onDownloadAnalysis);
+      dom.analysisStartOverButton.addEventListener("click", onStartOver);
+      dom.retryButton.addEventListener("click", onRetry);
+
+      dom.queryInput.addEventListener("input", () => {
+        state.query = dom.queryInput.value;
+        saveState();
+      });
+
+      dom.modelSelect.addEventListener("change", () => {
+        state.model = dom.modelSelect.value || DEFAULT_MODEL;
+        saveState();
+      });
+
+      dom.resumeInput.addEventListener("input", () => {
+        state.resumeText = dom.resumeInput.value;
+        saveState();
+      });
+
+      dom.resumeFile.addEventListener("change", async () => {
+        const file = dom.resumeFile.files?.[0] || null;
+        await onResumeFile(file);
+        dom.resumeFile.value = "";
+      });
+
+      dom.resumeDropzone.addEventListener("click", () => dom.resumeFile.click());
+      dom.resumeDropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dom.resumeDropzone.classList.add("border-blue-400", "bg-blue-50");
+      });
+      dom.resumeDropzone.addEventListener("dragleave", () => {
+        dom.resumeDropzone.classList.remove("border-blue-400", "bg-blue-50");
+      });
+      dom.resumeDropzone.addEventListener("drop", async (event) => {
+        event.preventDefault();
+        dom.resumeDropzone.classList.remove("border-blue-400", "bg-blue-50");
+        const file = event.dataTransfer?.files?.[0] || null;
+        await onResumeFile(file);
+      });
+
+      currentScreen = state.items.length ? "cards" : "input";
+      renderCurrentScreen();
+    });
+  </script>
+</body>
+
+</html>
