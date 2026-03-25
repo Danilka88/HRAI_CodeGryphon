@@ -44,6 +44,20 @@ export function setComparing(isComparing) {
   dlog("ui", "set comparing", isComparing);
 }
 
+export function setCompensationAnalyzing(isAnalyzing) {
+  if (!dom) {
+    return;
+  }
+
+  dom.compensationAnalyzeButton.disabled = isAnalyzing;
+  dom.compensationAnalyzeButton.textContent = isAnalyzing ? "Анализ..." : "Оценить условия найма";
+  dom.compensationStatus.textContent = isAnalyzing
+    ? "Ожидание ответа от локальной Ollama (до 180 секунд)..."
+    : "Результаты появятся после анализа через локальную Ollama.";
+
+  dlog("ui", "set compensation analyzing", isAnalyzing);
+}
+
 export function resetPdfPreview() {
   if (!dom) {
     return;
@@ -64,11 +78,23 @@ function updateGlobalNav() {
     ? `Текущая вакансия: ${currentTitle}`
     : "Текущая вакансия: не выбрана";
 
-  const isArchiveScreen = getCurrentScreen() === "archive";
+  const currentScreen = getCurrentScreen();
+  const isArchiveScreen = currentScreen === "archive";
+  const isCompensationScreen = currentScreen === "compensation";
+
   dom.globalNavArchiveButton.classList.toggle("bg-slate-700", isArchiveScreen);
   dom.globalNavArchiveButton.classList.toggle("hover:bg-slate-800", isArchiveScreen);
   dom.globalNavArchiveButton.classList.toggle("bg-blue-600", !isArchiveScreen);
   dom.globalNavArchiveButton.classList.toggle("hover:bg-blue-700", !isArchiveScreen);
+
+  dom.globalNavCompensationButton.classList.toggle("bg-cyan-600", isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("text-white", isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("hover:bg-cyan-700", isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("border-cyan-600", isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("bg-white", !isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("text-slate-700", !isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("hover:bg-slate-100", !isCompensationScreen);
+  dom.globalNavCompensationButton.classList.toggle("border-slate-300", !isCompensationScreen);
 }
 
 function renderHhResumeOptions() {
@@ -312,6 +338,7 @@ function buildHistoryRow(record) {
 export function renderInputScreen() {
   dom.screenInput.classList.remove("hidden");
   dom.screenInput.classList.add("flex");
+  dom.screenCompensation.classList.add("hidden");
   dom.screenCards.classList.add("hidden");
   dom.screenPreview.classList.add("hidden");
   dom.screenAnalysis.classList.add("hidden");
@@ -325,8 +352,29 @@ export function renderInputScreen() {
   dlog("ui", "render", "input", "query chars", (state.query || "").length);
 }
 
+export function renderCompensationScreen() {
+  dom.screenInput.classList.add("hidden");
+  dom.screenCompensation.classList.remove("hidden");
+  dom.screenCompensation.classList.add("flex");
+  dom.screenCards.classList.add("hidden");
+  dom.screenPreview.classList.add("hidden");
+  dom.screenAnalysis.classList.add("hidden");
+  dom.screenArchive.classList.add("hidden");
+  dom.screenBestVersion.classList.add("hidden");
+
+  dom.compensationQueryInput.value = state.compensationQuery || "";
+  dom.compensationModelSelect.value = state.compensationModel || DEFAULT_MODEL;
+  dom.compensationSalaryRange.textContent = state.compensationResult.salaryRange || "—";
+  dom.compensationCompanyConditions.textContent = state.compensationResult.companyConditions || "—";
+  dom.compensationHiringRecommendations.textContent = state.compensationResult.hiringRecommendations || "—";
+  setCompensationAnalyzing(false);
+  updateGlobalNav();
+  dlog("ui", "render", "compensation", "query chars", (state.compensationQuery || "").length);
+}
+
 export function renderCardsScreen() {
   dom.screenInput.classList.add("hidden");
+  dom.screenCompensation.classList.add("hidden");
   dom.screenCards.classList.remove("hidden");
   dom.screenCards.classList.add("flex");
   dom.screenPreview.classList.add("hidden");
@@ -347,6 +395,7 @@ export function renderCardsScreen() {
 
 export function renderPreviewScreen() {
   dom.screenInput.classList.add("hidden");
+  dom.screenCompensation.classList.add("hidden");
   dom.screenCards.classList.add("hidden");
   dom.screenPreview.classList.remove("hidden");
   dom.screenPreview.classList.add("flex");
@@ -363,6 +412,7 @@ export function renderPreviewScreen() {
 
 export function renderAnalysisScreen() {
   dom.screenInput.classList.add("hidden");
+  dom.screenCompensation.classList.add("hidden");
   dom.screenCards.classList.add("hidden");
   dom.screenPreview.classList.add("hidden");
   dom.screenAnalysis.classList.remove("hidden");
@@ -388,6 +438,7 @@ export function renderAnalysisScreen() {
 
 export function renderArchiveScreen() {
   dom.screenInput.classList.add("hidden");
+  dom.screenCompensation.classList.add("hidden");
   dom.screenCards.classList.add("hidden");
   dom.screenPreview.classList.add("hidden");
   dom.screenAnalysis.classList.add("hidden");
@@ -411,6 +462,7 @@ export function renderArchiveScreen() {
 
 export function renderBestVersionScreen() {
   dom.screenInput.classList.add("hidden");
+  dom.screenCompensation.classList.add("hidden");
   dom.screenCards.classList.add("hidden");
   dom.screenPreview.classList.add("hidden");
   dom.screenAnalysis.classList.add("hidden");
@@ -429,6 +481,11 @@ export function renderBestVersionScreen() {
 export function renderCurrentScreen() {
   const currentScreen = getCurrentScreen();
   dlog("ui", "render current screen", currentScreen);
+
+  if (currentScreen === "compensation") {
+    renderCompensationScreen();
+    return;
+  }
 
   if (currentScreen === "cards") {
     renderCardsScreen();

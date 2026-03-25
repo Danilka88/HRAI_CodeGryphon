@@ -15,6 +15,10 @@ export const APP_TEMPLATE = `
           class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
           Новая вакансия
         </button>
+        <button id="globalNavCompensationButton" type="button"
+          class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+          Зарплата и условия
+        </button>
         <button id="globalNavArchiveButton" type="button"
           class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
           Архив
@@ -79,6 +83,54 @@ export const APP_TEMPLATE = `
 
         <div id="inputHint" class="mt-4 text-xs text-slate-500">
           Данные сохраняются в архиве IndexedDB текущего браузера.
+        </div>
+      </div>
+    </section>
+
+    <section id="screenCompensation" class="hidden flex-col gap-6">
+      <div class="rounded-2xl border border-cyan-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-2">
+          <h2 class="text-xl font-semibold">Оценка зарплаты и условий найма</h2>
+          <p class="text-sm text-slate-600">Введите роль (например, «Стоматолог»), и Ollama оценит примерную зарплату и рекомендации по условиям для повышения шанса найма.</p>
+        </div>
+
+        <label for="compensationQueryInput" class="mt-5 block text-sm font-medium text-slate-700">Роль / специализация</label>
+        <input id="compensationQueryInput" type="text" placeholder="Например: Стоматолог"
+          class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20" />
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="compensationModelSelect" class="block text-sm font-medium text-slate-700">Модель Ollama</label>
+            <select id="compensationModelSelect"
+              class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20">
+              <option value="qwen3.5:0.8b">qwen3.5:0.8b</option>
+              <option value="gemma3:4b">gemma3:4b</option>
+              <option value="qwen3.5:4b">qwen3.5:4b</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button id="compensationAnalyzeButton" type="button"
+              class="inline-flex w-full items-center justify-center rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-cyan-300">
+              Оценить условия найма
+            </button>
+          </div>
+        </div>
+
+        <p id="compensationStatus" class="mt-4 text-xs text-slate-500">Результаты появятся после анализа через локальную Ollama.</p>
+
+        <div class="mt-6 grid gap-4 lg:grid-cols-3">
+          <article class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <h3 class="text-sm font-semibold text-emerald-800">Ориентир по зарплате</h3>
+            <p id="compensationSalaryRange" class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-emerald-900">—</p>
+          </article>
+          <article class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <h3 class="text-sm font-semibold text-blue-800">Условия для соискателя</h3>
+            <p id="compensationCompanyConditions" class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-blue-900">—</p>
+          </article>
+          <article class="rounded-xl border border-violet-200 bg-violet-50 p-4">
+            <h3 class="text-sm font-semibold text-violet-800">Что усилить в найме</h3>
+            <p id="compensationHiringRecommendations" class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-violet-900">—</p>
+          </article>
         </div>
       </div>
     </section>

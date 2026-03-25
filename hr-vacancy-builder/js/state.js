@@ -21,6 +21,13 @@ const createInitialState = () => ({
   hhResumes: [],
   hhSelectedResumeId: "",
   hhNotice: "",
+  compensationQuery: "",
+  compensationModel: DEFAULT_MODEL,
+  compensationResult: {
+    salaryRange: "",
+    companyConditions: "",
+    hiringRecommendations: ""
+  },
   version: 1
 });
 
@@ -95,6 +102,15 @@ const sanitizeHhResumes = (resumes) => {
       };
     })
     .filter(Boolean);
+};
+
+const sanitizeCompensationResult = (result) => {
+  const safe = result && typeof result === "object" ? result : {};
+  return {
+    salaryRange: typeof safe.salaryRange === "string" ? safe.salaryRange.trim() : "",
+    companyConditions: typeof safe.companyConditions === "string" ? safe.companyConditions.trim() : "",
+    hiringRecommendations: typeof safe.hiringRecommendations === "string" ? safe.hiringRecommendations.trim() : ""
+  };
 };
 
 const sanitizeHhSettings = (value) => {
@@ -174,6 +190,12 @@ const hydrateState = (nextState) => {
   state.hhResumes = sanitizeHhResumes(nextState.hhResumes);
   state.hhSelectedResumeId = typeof nextState.hhSelectedResumeId === "string" ? nextState.hhSelectedResumeId : "";
   state.hhNotice = typeof nextState.hhNotice === "string" ? nextState.hhNotice : "";
+
+  state.compensationQuery = typeof nextState.compensationQuery === "string" ? nextState.compensationQuery : "";
+  state.compensationModel = typeof nextState.compensationModel === "string" && nextState.compensationModel
+    ? nextState.compensationModel
+    : DEFAULT_MODEL;
+  state.compensationResult = sanitizeCompensationResult(nextState.compensationResult);
   state.version = 1;
 };
 
@@ -203,7 +225,10 @@ export function loadVacancyIntoState(record) {
     hhPerPage: state.hhPerPage,
     hhResumes: state.hhResumes,
     hhSelectedResumeId: state.hhSelectedResumeId,
-    hhNotice: state.hhNotice
+    hhNotice: state.hhNotice,
+    compensationQuery: state.compensationQuery,
+    compensationModel: state.compensationModel,
+    compensationResult: state.compensationResult
   });
 }
 
@@ -223,7 +248,10 @@ export function loadAnalysisIntoState(record, linkedVacancyItems = []) {
     hhPerPage: state.hhPerPage,
     hhResumes: state.hhResumes,
     hhSelectedResumeId: state.hhSelectedResumeId,
-    hhNotice: state.hhNotice
+    hhNotice: state.hhNotice,
+    compensationQuery: state.compensationQuery,
+    compensationModel: state.compensationModel,
+    compensationResult: state.compensationResult
   });
 }
 

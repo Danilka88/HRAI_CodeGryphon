@@ -76,6 +76,39 @@ function splitDelimitedUnique(raw, logTag) {
   return unique;
 }
 
+function extractCompensationSections(rawText) {
+  const extracted = new Map();
+  const keyPattern = /(?:\*\*)?\b(SALARY_RANGE|COMPANY_CONDITIONS|HIRING_RECOMMENDATIONS)\b(?:\*\*)?\s*:/gi;
+  const matches = Array.from(rawText.matchAll(keyPattern));
+
+  if (!matches.length) {
+    return extracted;
+  }
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const current = matches[index];
+    const key = (current[1] || "").toUpperCase();
+    const valueStart = (current.index || 0) + current[0].length;
+    const valueEnd = index + 1 < matches.length ? (matches[index + 1].index || rawText.length) : rawText.length;
+    const value = rawText
+      .slice(valueStart, valueEnd)
+      .replace(/^\s*;;;\s*/g, "")
+      .replace(/\s*;;;\s*$/g, "")
+      .replace(/^[\s:;\-–—]+/g, "")
+      .trim();
+
+    if (!value) {
+      continue;
+    }
+
+    if (!extracted.has(key)) {
+      extracted.set(key, value);
+    }
+  }
+
+  return extracted;
+}
+
 export function parseOllamaResponse(raw) {
   return splitDelimitedUnique(raw, "parse").map((text, idx) => ({
     id: `req-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
@@ -105,6 +138,54 @@ export function parseAnalysisResponse(raw) {
       isEditing: false
     };
   });
+}
+
+export function parseCompensationInsightsResponse(raw) {
+  if (typeof raw !== "string") {
+    throw new Error("Ответ модели не является текстом.");
+  }
+
+  const normalized = raw.replace(/\r/g, "").trim();
+  dlog("compensation parse", "raw length", normalized.length);
+  if (!normalized) {
+    throw new Error("Модель вернула пустой ответ.");
+  }
+
+  const parsedByKey = extractCompensationSections(normalized);
+
+  if (parsedByKey.size < 3 && normalized.includes(";;;")) {
+    const parts = splitDelimitedUnique(normalized, "compensation parse fallback");
+    for (const part of parts) {
+      const match = part.match(/^([A-Z_]+)\s*:\s*(.+)$/i);
+      if (!match) {
+        continue;
+      }
+
+      const key = match[1].trim().toUpperCase();
+      const value = match[2].trim();
+      if (!value || parsedByKey.has(key)) {
+        continue;
+      }
+
+      if (key === "SALARY_RANGE" || key === "COMPANY_CONDITIONS" || key === "HIRING_RECOMMENDATIONS") {
+        parsedByKey.set(key, value);
+      }
+    }
+  }
+
+  const salaryRange = parsedByKey.get("SALARY_RANGE") || "";
+  const companyConditions = parsedByKey.get("COMPANY_CONDITIONS") || "";
+  const hiringRecommendations = parsedByKey.get("HIRING_RECOMMENDATIONS") || "";
+
+  if (!salaryRange || !companyConditions || !hiringRecommendations) {
+    throw new Error("Модель вернула неполный ответ. Ожидаются поля SALARY_RANGE, COMPANY_CONDITIONS и HIRING_RECOMMENDATIONS.");
+  }
+
+  return {
+    salaryRange,
+    companyConditions,
+    hiringRecommendations
+  };
 }
 
 // ─── SECTION: Markdown Helpers ───

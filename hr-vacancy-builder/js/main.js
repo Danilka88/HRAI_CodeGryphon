@@ -11,7 +11,10 @@ import {
   listHistoryRecords,
   updateVacancyRecord
 } from "./indexeddb.js";
-import { generateRequirements as generateRequirementsRequest } from "./ollama-api.js";
+import {
+  generateCompensationInsights as generateCompensationInsightsRequest,
+  generateRequirements as generateRequirementsRequest
+} from "./ollama-api.js";
 import {
   getBestVersionResult,
   getCurrentScreen,
@@ -42,6 +45,7 @@ import {
   downloadCsv,
   downloadMarkdown,
   hideError,
+  parseCompensationInsightsResponse,
   parseOllamaResponse,
   runRetryAction,
   sanitizeFilename,
@@ -54,6 +58,7 @@ import {
   renderCardsScreen,
   renderCurrentScreen,
   resetPdfPreview,
+  setCompensationAnalyzing,
   setGenerating
 } from "./ui-renderer.js";
 import {
@@ -67,12 +72,14 @@ import {
 // ─── SECTION: DOM References ───
 const dom = {
   screenInput: document.getElementById("screenInput"),
+  screenCompensation: document.getElementById("screenCompensation"),
   screenCards: document.getElementById("screenCards"),
   screenPreview: document.getElementById("screenPreview"),
   screenAnalysis: document.getElementById("screenAnalysis"),
   screenArchive: document.getElementById("screenArchive"),
   screenBestVersion: document.getElementById("screenBestVersion"),
   globalNavNewButton: document.getElementById("globalNavNewButton"),
+  globalNavCompensationButton: document.getElementById("globalNavCompensationButton"),
   globalNavArchiveButton: document.getElementById("globalNavArchiveButton"),
   globalCurrentVacancy: document.getElementById("globalCurrentVacancy"),
   openArchiveButton: document.getElementById("openArchiveButton"),
@@ -80,6 +87,13 @@ const dom = {
   modelSelect: document.getElementById("modelSelect"),
   generateButton: document.getElementById("generateButton"),
   inputHint: document.getElementById("inputHint"),
+  compensationQueryInput: document.getElementById("compensationQueryInput"),
+  compensationModelSelect: document.getElementById("compensationModelSelect"),
+  compensationAnalyzeButton: document.getElementById("compensationAnalyzeButton"),
+  compensationStatus: document.getElementById("compensationStatus"),
+  compensationSalaryRange: document.getElementById("compensationSalaryRange"),
+  compensationCompanyConditions: document.getElementById("compensationCompanyConditions"),
+  compensationHiringRecommendations: document.getElementById("compensationHiringRecommendations"),
   cardsMetaCount: document.getElementById("cardsMetaCount"),
   cardsGrid: document.getElementById("cardsGrid"),
   backToInputButton: document.getElementById("backToInputButton"),
@@ -306,6 +320,47 @@ async function generateRequirements() {
   }
 }
 
+async function analyzeCompensationInsights() {
+  hideError();
+
+  const query = dom.compensationQueryInput.value.trim();
+  const model = dom.compensationModelSelect.value || DEFAULT_MODEL;
+
+  if (!query) {
+    showError("Введите роль или специализацию для оценки зарплаты и условий.");
+    return;
+  }
+
+  state.compensationQuery = query;
+  state.compensationModel = model;
+  saveState();
+  dlog("compensation", "starting", "query", query, "model", model);
+
+  setCompensationAnalyzing(true);
+
+  try {
+    const outputText = await generateCompensationInsightsRequest({ query, model });
+    const parsed = parseCompensationInsightsResponse(outputText);
+    state.compensationResult = {
+      salaryRange: parsed.salaryRange,
+      companyConditions: parsed.companyConditions,
+      hiringRecommendations: parsed.hiringRecommendations
+    };
+    saveState();
+
+    renderCurrentScreen();
+    dlog("compensation", "success", "salary chars", state.compensationResult.salaryRange.length);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Неизвестная ошибка.";
+    derror("compensation", "error", msg);
+    showError(`Не удалось получить оценку зарплаты и условий. ${msg}`, () => {
+      analyzeCompensationInsights();
+    });
+  } finally {
+    setCompensationAnalyzing(false);
+  }
+}
+
 function startOver(source = "workflow") {
   hideError();
   resetState();
@@ -395,6 +450,13 @@ function onBackToInput() {
   hideError();
   setCurrentScreen("input");
   dlog("navigation", "back to input");
+  renderCurrentScreen();
+}
+
+function onOpenCompensation() {
+  hideError();
+  setCurrentScreen("compensation");
+  dlog("navigation", "open compensation screen");
   renderCurrentScreen();
 }
 
@@ -724,6 +786,11 @@ function setupEventListeners() {
     startOver("navigation");
   });
 
+  dom.globalNavCompensationButton.addEventListener("click", () => {
+    dlog("event", "globalNavCompensationButton click");
+    onOpenCompensation();
+  });
+
   dom.globalNavArchiveButton.addEventListener("click", () => {
     dlog("event", "globalNavArchiveButton click");
     onOpenArchive("navigation");
@@ -737,6 +804,11 @@ function setupEventListeners() {
   dom.generateButton.addEventListener("click", () => {
     dlog("event", "generateButton click");
     generateRequirements();
+  });
+
+  dom.compensationAnalyzeButton.addEventListener("click", () => {
+    dlog("event", "compensationAnalyzeButton click");
+    analyzeCompensationInsights();
   });
 
   dom.cardsGrid.addEventListener("click", onCardsGridClick);
@@ -856,6 +928,18 @@ function setupEventListeners() {
     state.model = dom.modelSelect.value || DEFAULT_MODEL;
     saveState();
     dlog("input", "model updated", state.model);
+  });
+
+  dom.compensationQueryInput.addEventListener("input", () => {
+    state.compensationQuery = dom.compensationQueryInput.value;
+    saveState();
+    dlog("input", "compensation query updated", "chars", state.compensationQuery.length);
+  });
+
+  dom.compensationModelSelect.addEventListener("change", () => {
+    state.compensationModel = dom.compensationModelSelect.value || DEFAULT_MODEL;
+    saveState();
+    dlog("input", "compensation model updated", state.compensationModel);
   });
 
   dom.resumeInput.addEventListener("input", () => {

@@ -9,6 +9,7 @@ import {
 } from "./config.js";
 import {
   buildBestVersionPrompt,
+  buildCompensationInsightsPrompt,
   buildRequirementsPrompt,
   buildResumeAnalysisPrompt
 } from "./prompts.js";
@@ -88,6 +89,12 @@ export async function generateResumeAnalysis({ requirements, resumeText, model }
   const selectedModel = model || DEFAULT_MODEL;
   const prompt = buildResumeAnalysisPrompt(requirements, resumeText);
   return callOllamaGenerate(prompt, selectedModel, "analysis");
+}
+
+export async function generateCompensationInsights({ query, model }) {
+  const selectedModel = model || DEFAULT_MODEL;
+  const prompt = buildCompensationInsightsPrompt(query);
+  return callOllamaGenerate(prompt, selectedModel, "compensation-insights");
 }
 
 export async function generateBestVersionChoice({ query, vacancies, model }) {

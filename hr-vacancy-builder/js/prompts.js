@@ -32,6 +32,20 @@ export function buildResumeAnalysisPrompt(requirements, resumeText) {
   ].join("\n");
 }
 
+export function buildCompensationInsightsPrompt(query) {
+  return [
+    "Ты — HR-аналитик по рынку труда РФ.",
+    "По названию роли и краткому запросу оцени: ориентировочную зарплатную вилку и условия, которые повысят вероятность найма кандидата.",
+    "Ответ верни СТРОГО в 3 частях через ;;; без markdown, списков, JSON и без вступлений:",
+    "SALARY_RANGE: <ориентировочная зарплатная вилка в месяц, в рублях, например 180000-260000 руб.>",
+    "COMPANY_CONDITIONS: <какие условия компания должна предложить соискателю, 2-5 предложений>",
+    "HIRING_RECOMMENDATIONS: <что сделать рекрутингу/менеджеру, чтобы повысить шанс найма, 2-5 предложений>",
+    "Не используй разделитель ;;; внутри самих частей.",
+    "",
+    `Запрос роли: ${query}`
+  ].join("\n");
+}
+
 export function buildBestVersionPrompt(query, vacancies) {
   const vacancyLines = vacancies
     .map((vacancy, index) => {
