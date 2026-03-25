@@ -1,0 +1,21 @@
+:root {
+  color-scheme: light;
+}
+
+body {
+  min-height: 100vh;
+}
+
+[contenteditable="true"]:focus {
+  outline: 2px solid rgb(59 130 246 / 0.35);
+  outline-offset: 2px;
+}
+
+.card-transition {
+  transition: all 0.2s ease;
+}
+
+.markdown-preview {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
