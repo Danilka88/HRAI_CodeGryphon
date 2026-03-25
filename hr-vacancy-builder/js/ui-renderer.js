@@ -279,7 +279,7 @@ function buildHistoryRow(record) {
   csvButton.dataset.kind = record.kind;
   csvButton.dataset.id = String(record.id);
   csvButton.className = "rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700";
-  csvButton.textContent = "Download .csv";
+  csvButton.textContent = "Скачать .csv";
 
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
