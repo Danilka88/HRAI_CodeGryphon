@@ -26,6 +26,7 @@ import {
   saveState,
   setBestVersionResult,
   setCurrentScreen,
+  setHhSelectedResumeId,
   setHistoryFilter,
   setHistoryRecords,
   setLastAnalysisMarkdown,
@@ -33,7 +34,12 @@ import {
   state
 } from "./state.js";
 import {
+  buildAnalysisCsv,
+  buildAnalysisCsvFromRecord,
   buildAnalysisMarkdown,
+  buildRequirementsCsv,
+  buildRequirementsCsvFromRecord,
+  downloadCsv,
   downloadMarkdown,
   hideError,
   parseOllamaResponse,
@@ -51,7 +57,9 @@ import {
   setGenerating
 } from "./ui-renderer.js";
 import {
+  applySelectedHhResume,
   compareResumeWithRequirements,
+  fetchHhResumes,
   onAnalysisGridClick,
   onResumeFile
 } from "./resume-analysis.js";
@@ -78,6 +86,7 @@ const dom = {
   createDocumentButton: document.getElementById("createDocumentButton"),
   markdownPreview: document.getElementById("markdownPreview"),
   downloadButton: document.getElementById("downloadButton"),
+  downloadCsvButton: document.getElementById("downloadCsvButton"),
   nextToAnalysisButton: document.getElementById("nextToAnalysisButton"),
   startOverButton: document.getElementById("startOverButton"),
   resumeInput: document.getElementById("resumeInput"),
@@ -86,10 +95,20 @@ const dom = {
   pdfPreviewWrap: document.getElementById("pdfPreviewWrap"),
   pdfPreview: document.getElementById("pdfPreview"),
   compareButton: document.getElementById("compareButton"),
+  hhUseDemoCheckbox: document.getElementById("hhUseDemoCheckbox"),
+  hhApiKeyInput: document.getElementById("hhApiKeyInput"),
+  hhSearchQueryInput: document.getElementById("hhSearchQueryInput"),
+  hhAreaInput: document.getElementById("hhAreaInput"),
+  hhPerPageInput: document.getElementById("hhPerPageInput"),
+  hhFetchButton: document.getElementById("hhFetchButton"),
+  hhResumeSelect: document.getElementById("hhResumeSelect"),
+  hhApplyResumeButton: document.getElementById("hhApplyResumeButton"),
+  hhNotice: document.getElementById("hhNotice"),
   analysisMetaCount: document.getElementById("analysisMetaCount"),
   analysisGrid: document.getElementById("analysisGrid"),
   backToPreviewButton: document.getElementById("backToPreviewButton"),
   downloadAnalysisButton: document.getElementById("downloadAnalysisButton"),
+  downloadAnalysisCsvButton: document.getElementById("downloadAnalysisCsvButton"),
   analysisStartOverButton: document.getElementById("analysisStartOverButton"),
   historyFilterSelect: document.getElementById("historyFilterSelect"),
   historyMetaCount: document.getElementById("historyMetaCount"),
@@ -150,12 +169,13 @@ function hideBestVersionLoading() {
 }
 
 // ─── SECTION: Persistence & Archive Helpers ───
-async function persistVacancySnapshot(markdown) {
+async function persistVacancySnapshot(markdown, csv) {
   const payload = {
     query: state.query,
     model: state.model,
     items: state.items,
-    markdown
+    markdown,
+    csv
   };
 
   if (Number.isInteger(state.activeVacancyId)) {
@@ -382,7 +402,9 @@ async function onCreateDocument() {
   renderCurrentScreen();
 
   try {
-    await persistVacancySnapshot(getLastMarkdown());
+    const markdown = getLastMarkdown();
+    const csv = buildRequirementsCsv(state);
+    await persistVacancySnapshot(markdown, csv);
     saveState();
     await refreshHistory();
   } catch (error) {
@@ -417,6 +439,18 @@ function onDownload() {
   downloadMarkdown(filename, markdown);
 }
 
+function onDownloadCsv() {
+  if (!state.items.length) {
+    showError("Нечего скачивать. Сначала сформируйте требования вакансии.");
+    return;
+  }
+
+  const csv = buildRequirementsCsv(state);
+  const filename = `${sanitizeFilename(state.query || "vakansiya")}-requirements.csv`;
+  dlog("download", "requirements-csv", filename, "chars", csv.length);
+  downloadCsv(filename, csv);
+}
+
 function onDownloadAnalysis() {
   if (!state.analysisItems.length) {
     showError("Нечего скачивать. Сначала выполните сравнение резюме.");
@@ -428,6 +462,61 @@ function onDownloadAnalysis() {
   const filename = `${sanitizeFilename(state.query || "vakansiya")}-analysis.md`;
   dlog("download", "analysis", filename, "chars", markdown.length);
   downloadMarkdown(filename, markdown);
+}
+
+function onDownloadAnalysisCsv() {
+  if (!state.analysisItems.length) {
+    showError("Нечего скачивать. Сначала выполните сравнение резюме.");
+    return;
+  }
+
+  const csv = buildAnalysisCsv(state);
+  const filename = `${sanitizeFilename(state.query || "vakansiya")}-analysis.csv`;
+  dlog("download", "analysis-csv", filename, "chars", csv.length);
+  downloadCsv(filename, csv);
+}
+
+async function downloadHistoryCsv(kind, id) {
+  if (kind === "vacancy") {
+    const record = await getVacancyRecordById(id);
+    if (!record) {
+      throw new Error("Вакансия не найдена для CSV экспорта.");
+    }
+
+    const csv = typeof record.csv === "string" && record.csv.trim()
+      ? record.csv
+      : buildRequirementsCsvFromRecord(record);
+    const filename = `${sanitizeFilename(record.query || "vakansiya")}-requirements-archive.csv`;
+    dlog("archive", "download csv", kind, id, "chars", csv.length);
+    downloadCsv(filename, csv);
+    return;
+  }
+
+  if (kind === "analysis") {
+    const record = await getAnalysisRecordById(id);
+    if (!record) {
+      throw new Error("Анализ не найден для CSV экспорта.");
+    }
+
+    let linkedItems = [];
+    const linkedVacancyId = Number(record.vacancyId);
+    if (Number.isInteger(linkedVacancyId)) {
+      const linkedVacancy = await getVacancyRecordById(linkedVacancyId);
+      if (linkedVacancy && Array.isArray(linkedVacancy.items)) {
+        linkedItems = linkedVacancy.items;
+      }
+    }
+
+    const csv = typeof record.csv === "string" && record.csv.trim()
+      ? record.csv
+      : buildAnalysisCsvFromRecord(record, linkedItems);
+    const filename = `${sanitizeFilename(record.query || "analiz")}-analysis-archive.csv`;
+    dlog("archive", "download csv", kind, id, "chars", csv.length);
+    downloadCsv(filename, csv);
+    return;
+  }
+
+  throw new Error("Неизвестный тип записи архива для CSV экспорта.");
 }
 
 async function onOpenArchive(source = "workflow") {
@@ -552,6 +641,11 @@ async function onHistoryGridClick(event) {
       return;
     }
 
+    if (action === "download-history-csv") {
+      await downloadHistoryCsv(kind, id);
+      return;
+    }
+
     if (action === "find-best-version") {
       await onFindBestVersion(id, target);
       return;
@@ -619,6 +713,7 @@ function setupEventListeners() {
     onCreateDocument();
   });
   dom.downloadButton.addEventListener("click", onDownload);
+  dom.downloadCsvButton.addEventListener("click", onDownloadCsv);
   dom.nextToAnalysisButton.addEventListener("click", onNextToAnalysis);
   dom.startOverButton.addEventListener("click", () => {
     startOver();
@@ -631,11 +726,57 @@ function setupEventListeners() {
     await refreshHistory();
   });
 
+  dom.hhUseDemoCheckbox.addEventListener("change", () => {
+    state.hhUseDemo = dom.hhUseDemoCheckbox.checked;
+    state.hhNotice = state.hhUseDemo
+      ? "Демо-режим hh.ru включён."
+      : "Режим API hh.ru включён. Укажите API-ключ и нажмите загрузку.";
+    saveState();
+    renderCurrentScreen();
+  });
+
+  dom.hhApiKeyInput.addEventListener("input", () => {
+    state.hhApiKey = dom.hhApiKeyInput.value;
+    saveState();
+  });
+
+  dom.hhSearchQueryInput.addEventListener("input", () => {
+    state.hhSearchQuery = dom.hhSearchQueryInput.value;
+    saveState();
+  });
+
+  dom.hhAreaInput.addEventListener("input", () => {
+    const area = Number(dom.hhAreaInput.value);
+    state.hhArea = Number.isInteger(area) && area > 0 ? area : 1;
+    saveState();
+  });
+
+  dom.hhPerPageInput.addEventListener("input", () => {
+    const perPage = Number(dom.hhPerPageInput.value);
+    state.hhPerPage = Number.isInteger(perPage) && perPage >= 1 ? Math.min(perPage, 100) : 20;
+    saveState();
+  });
+
+  dom.hhFetchButton.addEventListener("click", async () => {
+    await fetchHhResumes(dom);
+  });
+
+  dom.hhResumeSelect.addEventListener("change", () => {
+    setHhSelectedResumeId(dom.hhResumeSelect.value);
+    saveState();
+    renderCurrentScreen();
+  });
+
+  dom.hhApplyResumeButton.addEventListener("click", () => {
+    applySelectedHhResume(dom);
+  });
+
   dom.analysisGrid.addEventListener("click", (event) => {
     onAnalysisGridClick(event, dom);
   });
   dom.backToPreviewButton.addEventListener("click", onBackToPreview);
   dom.downloadAnalysisButton.addEventListener("click", onDownloadAnalysis);
+  dom.downloadAnalysisCsvButton.addEventListener("click", onDownloadAnalysisCsv);
   dom.analysisStartOverButton.addEventListener("click", () => {
     startOver();
   });

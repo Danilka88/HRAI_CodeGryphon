@@ -76,6 +76,10 @@ function sanitizeAnalysisItems(items) {
     .filter((item) => item.text);
 }
 
+function sanitizeCsv(value) {
+  return typeof value === "string" ? value : "";
+}
+
 // ─── SECTION: DB Init ───
 export function initDatabase() {
   if (dbPromise) {
@@ -141,7 +145,8 @@ export async function createVacancyRecord(payload) {
     query: typeof payload?.query === "string" ? payload.query.trim() : "",
     model: typeof payload?.model === "string" ? payload.model.trim() : "",
     items: sanitizeVacancyItems(payload?.items),
-    markdown: typeof payload?.markdown === "string" ? payload.markdown : ""
+    markdown: typeof payload?.markdown === "string" ? payload.markdown : "",
+    csv: sanitizeCsv(payload?.csv)
   };
 
   dlog("indexeddb", "save vacancy", "start", record.query || "без названия", "items", record.items.length);
@@ -170,7 +175,8 @@ export async function updateVacancyRecord(id, payload) {
     query: typeof payload?.query === "string" ? payload.query.trim() : current.query,
     model: typeof payload?.model === "string" ? payload.model.trim() : current.model,
     items: sanitizeVacancyItems(payload?.items ?? current.items),
-    markdown: typeof payload?.markdown === "string" ? payload.markdown : current.markdown
+    markdown: typeof payload?.markdown === "string" ? payload.markdown : current.markdown,
+    csv: typeof payload?.csv === "string" ? payload.csv : sanitizeCsv(current.csv)
   };
 
   dlog("indexeddb", "update vacancy", "start", numericId, record.query || "без названия");
@@ -250,7 +256,8 @@ export async function createAnalysisRecord(payload) {
     model: typeof payload?.model === "string" ? payload.model.trim() : "",
     resumeText: typeof payload?.resumeText === "string" ? payload.resumeText : "",
     analysisItems: sanitizeAnalysisItems(payload?.analysisItems),
-    markdown: typeof payload?.markdown === "string" ? payload.markdown : ""
+    markdown: typeof payload?.markdown === "string" ? payload.markdown : "",
+    csv: sanitizeCsv(payload?.csv)
   };
 
   dlog("indexeddb", "save analysis", "start", record.query || "без названия", "items", record.analysisItems.length);
@@ -284,7 +291,8 @@ export async function updateAnalysisRecord(id, payload) {
     model: typeof payload?.model === "string" ? payload.model.trim() : current.model,
     resumeText: typeof payload?.resumeText === "string" ? payload.resumeText : current.resumeText,
     analysisItems: sanitizeAnalysisItems(payload?.analysisItems ?? current.analysisItems),
-    markdown: typeof payload?.markdown === "string" ? payload.markdown : current.markdown
+    markdown: typeof payload?.markdown === "string" ? payload.markdown : current.markdown,
+    csv: typeof payload?.csv === "string" ? payload.csv : sanitizeCsv(current.csv)
   };
 
   dlog("indexeddb", "update analysis", "start", numericId, record.query || "без названия");

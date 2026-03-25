@@ -1,16 +1,18 @@
 // ─── SECTION: Imports ───
 import { DEFAULT_MODEL, derror, dlog } from "./config.js";
+import { formatHhResumeForTextarea, requestResumesFromHh } from "./hh-resume-provider.js";
 import {
   createAnalysisRecord,
   updateAnalysisRecord
 } from "./indexeddb.js";
 import { generateResumeAnalysis } from "./ollama-api.js";
-import { saveState, state } from "./state.js";
+import { saveState, setHhResumes, setHhSelectedResumeId, state } from "./state.js";
 import {
-  parseAnalysisResponse,
-  showError,
+  buildAnalysisCsv,
+  buildAnalysisMarkdown,
   hideError,
-  buildAnalysisMarkdown
+  parseAnalysisResponse,
+  showError
 } from "./utils.js";
 import {
   renderAnalysisScreen,
@@ -39,13 +41,15 @@ function readFileAsDataURL(file) {
 
 async function persistAnalysisSnapshot() {
   const markdown = buildAnalysisMarkdown(state);
+  const csv = buildAnalysisCsv(state);
   const payload = {
     vacancyId: Number.isInteger(state.activeVacancyId) ? state.activeVacancyId : null,
     query: state.query,
     model: state.model,
     resumeText: state.resumeText,
     analysisItems: state.analysisItems,
-    markdown
+    markdown,
+    csv
   };
 
   if (Number.isInteger(state.activeAnalysisId)) {
@@ -58,6 +62,82 @@ async function persistAnalysisSnapshot() {
   state.activeAnalysisId = createdId;
   dlog("indexeddb", "analysis created", createdId);
   return createdId;
+}
+
+function setHhFetchLoading(dom, isLoading) {
+  if (!dom?.hhFetchButton) {
+    return;
+  }
+
+  dom.hhFetchButton.disabled = isLoading;
+  dom.hhFetchButton.textContent = isLoading
+    ? "Загружаем..."
+    : "Загрузить резюме из hh.ru";
+}
+
+// ─── SECTION: hh.ru Flow ───
+export async function fetchHhResumes(dom) {
+  hideError();
+  setHhFetchLoading(dom, true);
+
+  try {
+    const response = await requestResumesFromHh({
+      useDemo: state.hhUseDemo,
+      apiKey: state.hhApiKey,
+      query: state.hhSearchQuery,
+      area: state.hhArea,
+      perPage: state.hhPerPage
+    });
+
+    setHhResumes(response.items);
+    state.hhNotice = response.notice;
+    saveState();
+    dlog("hh", "resumes loaded", "source", response.source, "count", response.items.length);
+
+    renderAnalysisScreen();
+
+    if (!response.items.length) {
+      showError("Резюме по заданным параметрам не найдены. Измените запрос и попробуйте снова.");
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Ошибка загрузки резюме hh.ru.";
+    derror("hh", "load error", msg);
+    showError(`Не удалось загрузить резюме. ${msg}`);
+  } finally {
+    setHhFetchLoading(dom, false);
+  }
+}
+
+export function applySelectedHhResume(dom) {
+  hideError();
+
+  if (!state.hhSelectedResumeId) {
+    showError("Сначала выберите резюме из списка hh.ru.");
+    return;
+  }
+
+  const selected = state.hhResumes.find((item) => item.id === state.hhSelectedResumeId);
+  if (!selected) {
+    showError("Выбранное резюме не найдено. Обновите список и попробуйте снова.");
+    return;
+  }
+
+  const text = formatHhResumeForTextarea(selected);
+  if (!text.trim()) {
+    showError("Не удалось подготовить текст выбранного резюме.");
+    return;
+  }
+
+  state.resumeText = text;
+  saveState();
+  if (dom?.resumeInput) {
+    dom.resumeInput.value = text;
+  }
+
+  state.hhNotice = `Резюме «${selected.name}» подставлено в поле анализа.`;
+  saveState();
+  dlog("hh", "resume applied", selected.id, "chars", text.length);
+  renderAnalysisScreen();
 }
 
 // ─── SECTION: Resume Upload Logic ───

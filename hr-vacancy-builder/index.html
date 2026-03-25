@@ -159,6 +159,10 @@
               class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
               Скачать .md
             </button>
+            <button id="downloadCsvButton" type="button"
+              class="inline-flex items-center justify-center rounded-xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">
+              Скачать .csv
+            </button>
             <button id="nextToAnalysisButton" type="button"
               class="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2">
               Далее: Анализ резюме кандидата
@@ -186,6 +190,65 @@
           <textarea id="resumeInput" rows="10" placeholder="Вставьте текст резюме кандидата..."
             class="mt-2 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"></textarea>
 
+          <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h3 class="text-sm font-semibold text-slate-800">Импорт резюме из hh.ru</h3>
+              <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input id="hhUseDemoCheckbox" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked />
+                Использовать демо-данные (по умолчанию)
+              </label>
+            </div>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div class="sm:col-span-2">
+                <label for="hhApiKeyInput" class="block text-xs font-medium text-slate-700">API-ключ hh.ru</label>
+                <input id="hhApiKeyInput" type="password" autocomplete="off" placeholder="Введите API-ключ (только для режима API)"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label for="hhSearchQueryInput" class="block text-xs font-medium text-slate-700">Поисковый запрос</label>
+                <input id="hhSearchQueryInput" type="text" value="NAME:Python"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label for="hhAreaInput" class="block text-xs font-medium text-slate-700">Регион (area)</label>
+                <input id="hhAreaInput" type="number" min="1" step="1" value="1"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label for="hhPerPageInput" class="block text-xs font-medium text-slate-700">Кол-во (per_page)</label>
+                <input id="hhPerPageInput" type="number" min="1" max="100" step="1" value="20"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div class="flex items-end">
+                <button id="hhFetchButton" type="button"
+                  class="inline-flex w-full items-center justify-center rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2">
+                  Загрузить резюме из hh.ru
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div>
+                <label for="hhResumeSelect" class="block text-xs font-medium text-slate-700">Найденные резюме</label>
+                <select id="hhResumeSelect"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                  <option value="">Сначала загрузите список резюме</option>
+                </select>
+              </div>
+              <div class="flex items-end">
+                <button id="hhApplyResumeButton" type="button"
+                  class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+                  Подставить выбранное
+                </button>
+              </div>
+            </div>
+
+            <p id="hhNotice" class="mt-3 text-xs text-slate-600">
+              Демо-режим включён: используйте тестовые данные без API-ключа.
+            </p>
+          </div>
+
           <div class="mt-4 grid gap-4 lg:grid-cols-2">
             <div id="resumeDropzone"
               class="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 transition">
@@ -205,10 +268,16 @@
               class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300">
               Сравнить резюме с требованиями
             </button>
-            <button id="downloadAnalysisButton" type="button"
-              class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300">
-              Скачать Analysis.md
-            </button>
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <button id="downloadAnalysisButton" type="button"
+                class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300">
+                Скачать Analysis.md
+              </button>
+              <button id="downloadAnalysisCsvButton" type="button"
+                class="inline-flex items-center justify-center rounded-xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-teal-300">
+                Скачать Analysis.csv
+              </button>
+            </div>
           </div>
 
           <div id="analysisGrid" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>

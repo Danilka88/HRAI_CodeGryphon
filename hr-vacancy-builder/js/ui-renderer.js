@@ -66,6 +66,50 @@ function updateGlobalNav() {
   dom.globalNavArchiveButton.classList.toggle("hover:bg-blue-700", !isArchiveScreen);
 }
 
+function renderHhResumeOptions() {
+  if (!dom) {
+    return;
+  }
+
+  dom.hhUseDemoCheckbox.checked = state.hhUseDemo !== false;
+  dom.hhApiKeyInput.value = state.hhApiKey || "";
+  dom.hhApiKeyInput.disabled = state.hhUseDemo !== false;
+  dom.hhSearchQueryInput.value = state.hhSearchQuery || "NAME:Python";
+  dom.hhAreaInput.value = String(state.hhArea || 1);
+  dom.hhPerPageInput.value = String(state.hhPerPage || 20);
+
+  dom.hhResumeSelect.innerHTML = "";
+  if (!state.hhResumes.length) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "Сначала загрузите список резюме";
+    dom.hhResumeSelect.appendChild(emptyOption);
+  } else {
+    state.hhResumes.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      const parts = [item.name];
+      if (item.title) {
+        parts.push(item.title);
+      }
+      if (item.employer) {
+        parts.push(item.employer);
+      }
+      option.textContent = parts.join(" • ");
+      dom.hhResumeSelect.appendChild(option);
+    });
+  }
+
+  const selectedId = state.hhSelectedResumeId || state.hhResumes[0]?.id || "";
+  dom.hhResumeSelect.value = selectedId;
+  dom.hhApplyResumeButton.disabled = !selectedId;
+
+  const fallbackNotice = state.hhUseDemo !== false
+    ? "Демо-режим включён: используйте тестовые данные без API-ключа."
+    : "Режим API включён: добавьте ключ и выполните загрузку резюме.";
+  dom.hhNotice.textContent = state.hhNotice || fallbackNotice;
+}
+
 // ─── SECTION: Card Renderers ───
 export function renderCard(item, index) {
   const wrapper = document.createElement("div");
@@ -222,6 +266,14 @@ function buildHistoryRow(record) {
   editButton.className = "rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700";
   editButton.textContent = "Редактировать";
 
+  const csvButton = document.createElement("button");
+  csvButton.type = "button";
+  csvButton.dataset.action = "download-history-csv";
+  csvButton.dataset.kind = record.kind;
+  csvButton.dataset.id = String(record.id);
+  csvButton.className = "rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700";
+  csvButton.textContent = "Download .csv";
+
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
   deleteButton.dataset.action = "delete-history";
@@ -230,7 +282,7 @@ function buildHistoryRow(record) {
   deleteButton.className = "rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700";
   deleteButton.textContent = "Удалить";
 
-  actions.append(selectButton, openButton, editButton);
+  actions.append(selectButton, openButton, editButton, csvButton);
 
   if (record.kind === "vacancy") {
     const findBestButton = document.createElement("button");
@@ -309,6 +361,8 @@ export function renderAnalysisScreen() {
   dom.screenBestVersion.classList.add("hidden");
 
   dom.resumeInput.value = state.resumeText || "";
+  renderHhResumeOptions();
+
   dom.analysisGrid.innerHTML = "";
   state.analysisItems.forEach((item, index) => {
     dom.analysisGrid.appendChild(renderAnalysisCard(item, index));
@@ -316,6 +370,7 @@ export function renderAnalysisScreen() {
 
   dom.analysisMetaCount.textContent = String(state.analysisItems.length);
   dom.downloadAnalysisButton.disabled = !state.analysisItems.length;
+  dom.downloadAnalysisCsvButton.disabled = !state.analysisItems.length;
   setComparing(false);
   updateGlobalNav();
 }
