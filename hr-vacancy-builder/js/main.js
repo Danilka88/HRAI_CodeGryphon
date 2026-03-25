@@ -191,8 +191,11 @@ async function persistVacancySnapshot(markdown, csv) {
 }
 
 async function refreshHistory() {
+  dlog("archive", "refresh", "filter", getHistoryFilter());
   const records = await listHistoryRecords(getHistoryFilter());
   setHistoryRecords(records);
+  dlog("archive", "refresh complete", "records", records.length);
+
   if (getCurrentScreen() === "archive") {
     renderArchiveScreen();
   }
@@ -200,6 +203,8 @@ async function refreshHistory() {
 
 async function openHistoryRecord(kind, id) {
   const numericId = Number(id);
+  dlog("archive", "open request", kind, numericId);
+
   if (!Number.isInteger(numericId)) {
     showError("Некорректный идентификатор записи архива.");
     return;
@@ -246,6 +251,7 @@ async function openHistoryRecord(kind, id) {
 }
 
 async function removeHistoryRecord(kind, id) {
+  dlog("archive", "delete request", kind, id);
   await deleteHistoryRecord(kind, id);
   const selected = state.activeVacancyId === Number(id) || state.activeAnalysisId === Number(id);
   if (selected && kind === "vacancy") {
@@ -325,6 +331,7 @@ function onCardsGridClick(event) {
 
   const index = Number(target.dataset.index);
   if (!Number.isInteger(index) || index < 0 || index >= state.items.length) {
+    dlog("card change", "skip invalid index", target.dataset.index);
     return;
   }
 
@@ -370,6 +377,7 @@ function onCardsGridClick(event) {
     const updatedText = editable ? editable.textContent.trim() : "";
     if (!updatedText) {
       showError("Текст требования не может быть пустым.");
+      dlog("card change", "index", index, "action", action, "validation", "empty text");
       return;
     }
 
@@ -386,6 +394,7 @@ function onCardsGridClick(event) {
 function onBackToInput() {
   hideError();
   setCurrentScreen("input");
+  dlog("navigation", "back to input");
   renderCurrentScreen();
 }
 
@@ -407,6 +416,7 @@ async function onCreateDocument() {
     await persistVacancySnapshot(markdown, csv);
     saveState();
     await refreshHistory();
+    dlog("document", "persisted", "vacancy id", state.activeVacancyId);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Не удалось сохранить вакансию.";
     derror("indexeddb", "save vacancy", "error", msg);
@@ -424,6 +434,7 @@ function onNextToAnalysis() {
 function onBackToPreview() {
   hideError();
   setCurrentScreen("preview");
+  dlog("navigation", "back to preview");
   renderCurrentScreen();
 }
 
@@ -477,6 +488,8 @@ function onDownloadAnalysisCsv() {
 }
 
 async function downloadHistoryCsv(kind, id) {
+  dlog("archive", "download history csv request", kind, id);
+
   if (kind === "vacancy") {
     const record = await getVacancyRecordById(id);
     if (!record) {
@@ -521,6 +534,8 @@ async function downloadHistoryCsv(kind, id) {
 
 async function onOpenArchive(source = "workflow") {
   hideError();
+  dlog("archive", "open request", "source", source);
+
   try {
     await refreshHistory();
     setCurrentScreen("archive");
@@ -541,12 +556,14 @@ function onBackFromArchive() {
   hideError();
   const target = state.items.length ? "cards" : "input";
   setCurrentScreen(target);
+  dlog("navigation", "back from archive", "target", target);
   renderCurrentScreen();
 }
 
 function onBackToArchiveFromBest() {
   hideError();
   setCurrentScreen("archive");
+  dlog("navigation", "back to archive from best-version");
   renderCurrentScreen();
 }
 
@@ -558,6 +575,7 @@ async function onOpenBestVacancy() {
     return;
   }
 
+  dlog("best-version", "open best vacancy", result.bestVacancyId);
   try {
     await openHistoryRecord("vacancy", result.bestVacancyId);
   } catch (error) {
@@ -604,8 +622,11 @@ async function onFindBestVersion(vacancyId, triggerButton = null) {
 }
 
 async function onHistoryFilterChange() {
-  setHistoryFilter(dom.historyFilterSelect.value);
+  const nextFilter = dom.historyFilterSelect.value;
+  dlog("archive", "filter change", nextFilter);
+  setHistoryFilter(nextFilter);
   setSelectedHistoryEntry(null);
+
   try {
     await refreshHistory();
   } catch (error) {
@@ -624,6 +645,8 @@ async function onHistoryGridClick(event) {
   const action = target.dataset.action;
   const kind = target.dataset.kind;
   const id = Number(target.dataset.id);
+  dlog("archive", "grid action", action, "kind", kind, "id", id);
+
   if (!Number.isInteger(id)) {
     showError("Некорректный идентификатор записи архива.");
     return;
@@ -654,6 +677,7 @@ async function onHistoryGridClick(event) {
     if (action === "delete-history") {
       const ok = window.confirm("Удалить выбранную запись из архива? Это действие нельзя отменить.");
       if (!ok) {
+        dlog("archive", "delete cancelled", kind, id);
         return;
       }
 
@@ -672,16 +696,20 @@ async function onHistoryGridClick(event) {
 async function onClearHistory() {
   const ok = window.confirm("Очистить весь архив (вакансии и анализы)? Действие необратимо.");
   if (!ok) {
+    dlog("archive", "clear cancelled");
     return;
   }
 
   hideError();
+  dlog("archive", "clear start");
+
   try {
     await clearAllHistory();
     setHistoryRecords([]);
     setSelectedHistoryEntry(null);
     setBestVersionResult(null);
     renderArchiveScreen();
+    dlog("archive", "clear complete");
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Не удалось очистить архив.";
     derror("archive", "clear", "error", msg);
@@ -692,34 +720,41 @@ async function onClearHistory() {
 // ─── SECTION: Event Wiring ───
 function setupEventListeners() {
   dom.globalNavNewButton.addEventListener("click", () => {
+    dlog("event", "globalNavNewButton click");
     startOver("navigation");
   });
 
   dom.globalNavArchiveButton.addEventListener("click", () => {
+    dlog("event", "globalNavArchiveButton click");
     onOpenArchive("navigation");
   });
 
   dom.openArchiveButton.addEventListener("click", () => {
+    dlog("event", "openArchiveButton click");
     onOpenArchive();
   });
 
   dom.generateButton.addEventListener("click", () => {
+    dlog("event", "generateButton click");
     generateRequirements();
   });
 
   dom.cardsGrid.addEventListener("click", onCardsGridClick);
   dom.backToInputButton.addEventListener("click", onBackToInput);
   dom.createDocumentButton.addEventListener("click", () => {
+    dlog("event", "createDocumentButton click");
     onCreateDocument();
   });
   dom.downloadButton.addEventListener("click", onDownload);
   dom.downloadCsvButton.addEventListener("click", onDownloadCsv);
   dom.nextToAnalysisButton.addEventListener("click", onNextToAnalysis);
   dom.startOverButton.addEventListener("click", () => {
+    dlog("event", "startOverButton click");
     startOver();
   });
 
   dom.compareButton.addEventListener("click", async () => {
+    dlog("event", "compareButton click");
     state.resumeText = dom.resumeInput.value;
     saveState();
     await compareResumeWithRequirements();
@@ -732,42 +767,50 @@ function setupEventListeners() {
       ? "Демо-режим hh.ru включён."
       : "Режим API hh.ru включён. Укажите API-ключ и нажмите загрузку.";
     saveState();
+    dlog("hh", "mode changed", state.hhUseDemo ? "demo" : "api");
     renderCurrentScreen();
   });
 
   dom.hhApiKeyInput.addEventListener("input", () => {
     state.hhApiKey = dom.hhApiKeyInput.value;
     saveState();
+    dlog("hh", "api key updated", "length", state.hhApiKey.length);
   });
 
   dom.hhSearchQueryInput.addEventListener("input", () => {
     state.hhSearchQuery = dom.hhSearchQueryInput.value;
     saveState();
+    dlog("hh", "search query updated", state.hhSearchQuery);
   });
 
   dom.hhAreaInput.addEventListener("input", () => {
     const area = Number(dom.hhAreaInput.value);
     state.hhArea = Number.isInteger(area) && area > 0 ? area : 1;
     saveState();
+    dlog("hh", "area updated", state.hhArea);
   });
 
   dom.hhPerPageInput.addEventListener("input", () => {
     const perPage = Number(dom.hhPerPageInput.value);
     state.hhPerPage = Number.isInteger(perPage) && perPage >= 1 ? Math.min(perPage, 100) : 20;
     saveState();
+    dlog("hh", "per-page updated", state.hhPerPage);
   });
 
   dom.hhFetchButton.addEventListener("click", async () => {
+    dlog("event", "hhFetchButton click");
     await fetchHhResumes(dom);
   });
 
   dom.hhResumeSelect.addEventListener("change", () => {
     setHhSelectedResumeId(dom.hhResumeSelect.value);
     saveState();
+    dlog("hh", "selected resume", state.hhSelectedResumeId || "none");
     renderCurrentScreen();
   });
 
   dom.hhApplyResumeButton.addEventListener("click", () => {
+    dlog("event", "hhApplyResumeButton click");
     applySelectedHhResume(dom);
   });
 
@@ -778,6 +821,7 @@ function setupEventListeners() {
   dom.downloadAnalysisButton.addEventListener("click", onDownloadAnalysis);
   dom.downloadAnalysisCsvButton.addEventListener("click", onDownloadAnalysisCsv);
   dom.analysisStartOverButton.addEventListener("click", () => {
+    dlog("event", "analysisStartOverButton click");
     startOver();
   });
 
@@ -805,25 +849,30 @@ function setupEventListeners() {
   dom.queryInput.addEventListener("input", () => {
     state.query = dom.queryInput.value;
     saveState();
+    dlog("input", "query updated", "chars", state.query.length);
   });
 
   dom.modelSelect.addEventListener("change", () => {
     state.model = dom.modelSelect.value || DEFAULT_MODEL;
     saveState();
+    dlog("input", "model updated", state.model);
   });
 
   dom.resumeInput.addEventListener("input", () => {
     state.resumeText = dom.resumeInput.value;
     saveState();
+    dlog("input", "resume updated", "chars", state.resumeText.length);
   });
 
   dom.resumeFile.addEventListener("change", async () => {
     const file = dom.resumeFile.files?.[0] || null;
+    dlog("event", "resumeFile change", file ? file.name : "no file");
     await onResumeFile(file, dom);
     dom.resumeFile.value = "";
   });
 
   dom.resumeDropzone.addEventListener("click", () => {
+    dlog("event", "resumeDropzone click");
     dom.resumeFile.click();
   });
 
@@ -840,12 +889,16 @@ function setupEventListeners() {
     event.preventDefault();
     dom.resumeDropzone.classList.remove("border-blue-400", "bg-blue-50");
     const file = event.dataTransfer?.files?.[0] || null;
+    dlog("event", "resumeDropzone drop", file ? file.name : "no file");
     await onResumeFile(file, dom);
   });
+
+  dlog("init", "event listeners wired");
 }
 
 // ─── SECTION: Bootstrap ───
 document.addEventListener("DOMContentLoaded", async () => {
+  dlog("init", "DOMContentLoaded");
   setUtilsDom(dom);
   initUIRenderer(dom);
 
@@ -874,5 +927,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
 
   setCurrentScreen(state.items.length ? "cards" : "input");
+  dlog("init", "initial screen", getCurrentScreen());
   renderCurrentScreen();
 });

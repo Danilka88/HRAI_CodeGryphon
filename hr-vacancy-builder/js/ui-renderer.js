@@ -1,5 +1,5 @@
 // ─── SECTION: Imports ───
-import { DEFAULT_MODEL } from "./config.js";
+import { DEFAULT_MODEL, dlog } from "./config.js";
 import {
   getBestVersionResult,
   getCurrentScreen,
@@ -16,6 +16,7 @@ let dom = null;
 
 export function initUIRenderer(nextDom) {
   dom = nextDom;
+  dlog("ui", "renderer initialized");
 }
 
 // ─── SECTION: UI State Helpers ───
@@ -29,6 +30,8 @@ export function setGenerating(isGenerating) {
   dom.inputHint.textContent = isGenerating
     ? "Ожидание ответа от локальной Ollama (до 180 секунд)..."
     : "Данные сохраняются в архиве IndexedDB текущего браузера.";
+
+  dlog("ui", "set generating", isGenerating);
 }
 
 export function setComparing(isComparing) {
@@ -38,6 +41,7 @@ export function setComparing(isComparing) {
 
   dom.compareButton.disabled = isComparing;
   dom.compareButton.textContent = isComparing ? "Сравнение..." : "Сравнить резюме с требованиями";
+  dlog("ui", "set comparing", isComparing);
 }
 
 export function resetPdfPreview() {
@@ -47,6 +51,7 @@ export function resetPdfPreview() {
 
   dom.pdfPreview.removeAttribute("src");
   dom.pdfPreviewWrap.classList.add("hidden");
+  dlog("ui", "pdf preview reset");
 }
 
 function updateGlobalNav() {
@@ -108,6 +113,8 @@ function renderHhResumeOptions() {
     ? "Демо-режим включён: используйте тестовые данные без API-ключа."
     : "Режим API включён: добавьте ключ и выполните загрузку резюме.";
   dom.hhNotice.textContent = state.hhNotice || fallbackNotice;
+
+  dlog("ui", "hh options rendered", "mode", state.hhUseDemo !== false ? "demo" : "api", "resumes", state.hhResumes.length);
 }
 
 // ─── SECTION: Card Renderers ───
@@ -315,6 +322,7 @@ export function renderInputScreen() {
   dom.modelSelect.value = state.model || DEFAULT_MODEL;
   setGenerating(false);
   updateGlobalNav();
+  dlog("ui", "render", "input", "query chars", (state.query || "").length);
 }
 
 export function renderCardsScreen() {
@@ -334,6 +342,7 @@ export function renderCardsScreen() {
   dom.cardsMetaCount.textContent = String(state.items.length);
   dom.createDocumentButton.disabled = state.items.filter((item) => item.status !== "rejected" && item.text.trim()).length === 0;
   updateGlobalNav();
+  dlog("ui", "render", "cards", "count", state.items.length);
 }
 
 export function renderPreviewScreen() {
@@ -349,6 +358,7 @@ export function renderPreviewScreen() {
   setLastMarkdown(markdown);
   dom.markdownPreview.textContent = markdown;
   updateGlobalNav();
+  dlog("ui", "render", "preview", "chars", markdown.length);
 }
 
 export function renderAnalysisScreen() {
@@ -373,6 +383,7 @@ export function renderAnalysisScreen() {
   dom.downloadAnalysisCsvButton.disabled = !state.analysisItems.length;
   setComparing(false);
   updateGlobalNav();
+  dlog("ui", "render", "analysis", "items", state.analysisItems.length, "resume chars", (state.resumeText || "").length);
 }
 
 export function renderArchiveScreen() {
@@ -395,6 +406,7 @@ export function renderArchiveScreen() {
 
   dom.historyEmpty.classList.toggle("hidden", records.length > 0);
   updateGlobalNav();
+  dlog("ui", "render", "archive", "records", records.length, "filter", getHistoryFilter());
 }
 
 export function renderBestVersionScreen() {
@@ -411,10 +423,12 @@ export function renderBestVersionScreen() {
   dom.bestVersionBestBlock.textContent = result?.bestVacancyText || "—";
   dom.bestVersionWhyBlock.textContent = result?.whyNotOthers || "—";
   updateGlobalNav();
+  dlog("ui", "render", "best-version", "best vacancy", result?.bestVacancyId || null);
 }
 
 export function renderCurrentScreen() {
   const currentScreen = getCurrentScreen();
+  dlog("ui", "render current screen", currentScreen);
 
   if (currentScreen === "cards") {
     renderCardsScreen();
